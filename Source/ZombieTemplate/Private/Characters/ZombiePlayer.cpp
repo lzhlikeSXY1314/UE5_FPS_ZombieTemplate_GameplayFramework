@@ -211,9 +211,9 @@ void AZombiePlayer::PerformFireTrace()
     // 空仓检查：如果弹药为0，播放空仓音效并退出（不消耗后备，也不开火）
     if (CurrentWeapon->CurrentAmmo <= 0)
     {
-        if (CurrentWeapon->EmptyMagSound)
+        if (CurrentWeapon->VisualFX.EmptyMagSound)
         {
-            UGameplayStatics::PlaySoundAtLocation(GetWorld(), CurrentWeapon->EmptyMagSound, GetActorLocation());
+            UGameplayStatics::PlaySoundAtLocation(GetWorld(), CurrentWeapon->VisualFX.EmptyMagSound, GetActorLocation());
         }
         Reload();
         return;
@@ -236,14 +236,14 @@ void AZombiePlayer::PerformFireTrace()
     // 获取受附件影响的最终散布
     float Speed = FMath::Min(GetVelocity().Size(), 700.0f);
     float BaseSpreadAngle = bIsAiming ? CurrentWeapon->GetCurrentADSSpread() : CurrentWeapon->GetCurrentHipSpread();
-    float MovementFactor = bIsAiming ? CurrentWeapon->ADSMovementSpread : CurrentWeapon->HipMovementSpread;
+    float MovementFactor = bIsAiming ? CurrentWeapon->RecoilSpread.ADSMovementSpread : CurrentWeapon->RecoilSpread.HipMovementSpread;
     float ActualSpreadAngle = BaseSpreadAngle + (Speed / 100.0f) * BaseSpreadAngle * MovementFactor;
 
     // 生成在锥角 ActualSpreadAngle 内随机方向（均匀分布）
     FVector SpreadDir = FMath::VRandCone(AimDir, FMath::DegreesToRadians(ActualSpreadAngle));
 
     // 射线终点
-    FVector TraceEnd = MuzzleLoc + SpreadDir * CurrentWeapon->FireRange;
+    FVector TraceEnd = MuzzleLoc + SpreadDir * CurrentWeapon->VisualFX.FireRange;
 
 
     // ---------- 射线检测（带开关） ----------
@@ -286,10 +286,10 @@ void AZombiePlayer::PerformFireTrace()
     }
 
     // ---------- 后坐力 ----------
-    if (CurrentWeapon->bUseRecoil)
+    if (CurrentWeapon->RecoilSpread.bUseRecoil)
     {
-        AddControllerYawInput(FMath::RandRange(CurrentWeapon->RecoilYaw.X, CurrentWeapon->RecoilYaw.Y));
-        AddControllerPitchInput(FMath::RandRange(CurrentWeapon->RecoilPitch.X, CurrentWeapon->RecoilPitch.Y));
+        AddControllerYawInput(FMath::RandRange(CurrentWeapon->RecoilSpread.RecoilYaw.X, CurrentWeapon->RecoilSpread.RecoilYaw.Y));
+        AddControllerPitchInput(FMath::RandRange(CurrentWeapon->RecoilSpread.RecoilPitch.X, CurrentWeapon->RecoilSpread.RecoilPitch.Y));
     }
 
     // 开火晃动
@@ -356,7 +356,7 @@ void AZombiePlayer::UpdateArmsFromFOV(float FOVValue)
     FVector TargetOffset = FVector::ZeroVector;
     if (bIsAiming && CurrentWeapon->ScopeMesh->IsVisible())
     {
-        TargetOffset = CurrentWeapon->ArmsLocCorrection;
+        TargetOffset = CurrentWeapon->AttachmentConfig.ArmsLocCorrection;
     }
 
     // 根据 Alpha 混合手臂位置（Alpha 从 0 → 1，手臂从默认位置移动至偏移位置）
@@ -372,21 +372,21 @@ float AZombiePlayer::CalculateDamage(float Distance, FName BoneName) const
 
     // 2. 距离衰减
     float FalloffMult = 1.0f;
-    if (CurrentWeapon->DamageFalloffCurve)
+    if (CurrentWeapon->DamageConfig.DamageFalloffCurve)
     {
-        FalloffMult = CurrentWeapon->DamageFalloffCurve->GetFloatValue(Distance);
+        FalloffMult = CurrentWeapon->DamageConfig.DamageFalloffCurve->GetFloatValue(Distance);
     }
     float AfterFalloff = BaseDamage * FalloffMult;
 
     // 3. 最低伤害
-    if (AfterFalloff < CurrentWeapon->MinimumDamage)
-        AfterFalloff = CurrentWeapon->MinimumDamage;
+    if (AfterFalloff < CurrentWeapon->DamageConfig.MinimumDamage)
+        AfterFalloff = CurrentWeapon->DamageConfig.MinimumDamage;
 
     // 4. 部位系数
     float BoneMult = 1.0f;
-    if (CurrentWeapon->BoneDamageMultipliers.Contains(BoneName))
+    if (CurrentWeapon->DamageConfig.BoneDamageMultipliers.Contains(BoneName))
     {
-        BoneMult = CurrentWeapon->BoneDamageMultipliers[BoneName];
+        BoneMult = CurrentWeapon->DamageConfig.BoneDamageMultipliers[BoneName];
     }
 
     return AfterFalloff * BoneMult;
@@ -559,10 +559,10 @@ void AZombiePlayer::Reload()
     if (!CurrentWeapon) return;
 
     // 武器当前已满弹，无需换弹
-    if (CurrentWeapon->CurrentAmmo >= CurrentWeapon->MaxAmmo) return;
+    if (CurrentWeapon->CurrentAmmo >= CurrentWeapon->AmmoAndUIConfig.MaxAmmo) return;
 
     // 计算需要补充的子弹数
-    int32 Needed = CurrentWeapon->MaxAmmo - CurrentWeapon->CurrentAmmo;
+    int32 Needed = CurrentWeapon->AmmoAndUIConfig.MaxAmmo - CurrentWeapon->CurrentAmmo;
 
     // 根据后备弹药实际可提供的数量
     int32 TransferAmount = FMath::Min(Needed, ReserveAmmo);

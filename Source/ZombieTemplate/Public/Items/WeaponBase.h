@@ -13,6 +13,216 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAmmoEmptyStateChanged, bool, bIsE
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteract, bool, Equip);
 
+//FWeaponRecoilSpread
+USTRUCT(BlueprintType)
+struct FWeaponRecoilSpread
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Recoil")
+    FVector2D RecoilYaw = FVector2D(-0.5f, 0.5f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Recoil")
+    FVector2D RecoilPitch = FVector2D(-0.7f, 0.2f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Recoil")
+    bool bUseRecoil = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spread")
+    float HipBaseSpread = 1.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spread")
+    float HipMovementSpread = 0.02f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spread")
+    float ADSBaseSpread = 0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spread")
+    float ADSMovementSpread = 0.005f;
+
+    // 配件乘数也放在这里（它们本来就是用来调整散布和后坐力的）
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float CompensatorSpreadMultiplier = 0.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float CompensatorRecoilMultiplier = 0.7f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float SilencerSpreadMultiplier = 1.1f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float SilencerRecoilMultiplier = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float LaserHipSpreadMultiplier = 0.3f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float LaserADSSpreadMultiplier = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float ScopeADSSpreadMultiplier = 0.5f;
+};
+
+//FWeaponVisualFX 
+USTRUCT(BlueprintType)
+struct FWeaponVisualFX
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* FireSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundAttenuation* FireSoundAttenuation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundConcurrency* FireSoundConcurrency;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* ImpactSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* NoImpactSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    UParticleSystem* MuzzleFlashParticle;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleScale = FVector(0.5f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleFlashOffset_Default = FVector(45.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleFlashOffset_Compensator = FVector(55.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleFlashOffset_Silencer = FVector(65.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    UParticleSystem* MuzzleSmokeParticle;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleSmokeScale = FVector(0.25f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleSmokeOffset_Default = FVector(5.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleSmokeOffset_Silencer = FVector(20.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    FVector MuzzleSmokeOffset_Scope = FVector(10.0f, 0.0f, 0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX")
+    float FireRange = 10000.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* CaseEjectImpactSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire")
+    TEnumAsByte<ECollisionChannel> TraceChannel = ECC_GameTraceChannel1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Decal")
+    TSubclassOf<AActor> BulletHoleDecalClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* EmptyMagSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
+    int32 MuzzleSmokePoolSize = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
+    float SmokeDelay = 0.1f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
+    float ShotCounterResetTime = 2.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
+    int32 ShotsToStartSmoke = 5;
+};
+
+USTRUCT(BlueprintType)
+struct FWeaponDamage
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+    float Damage = 25.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+    TMap<FName, float> BoneDamageMultipliers;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+    UCurveFloat* DamageFalloffCurve;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+    float MinimumDamage = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+    TSubclassOf<UDamageType> DamageTypeClass = UDamageType::StaticClass();
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachments")
+    float SilencerDamageMultiplier = 0.8f;
+};
+
+USTRUCT(BlueprintType)
+struct FWeaponAttachmentConfig
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compensator")
+    USoundBase* CompensatorFireSound;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compensator")
+    TSubclassOf<AActor> CompensatorDropClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Silencer")
+    USoundBase* SilencerFireSound;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Silencer")
+    TSubclassOf<AActor> SilencerDropClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scope")
+    FVector ArmsLocCorrection = FVector(0.0f, 0.0f, -1.484848f);
+};
+
+USTRUCT(BlueprintType)
+struct FWeaponAnimMontageSet
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire")
+    UAnimMontage* FireMontage_Hip_Hands;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire")
+    UAnimMontage* FireMontage_ADS_Hands;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire")
+    UAnimMontage* FireMontage_Weapon;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reload")
+    UAnimMontage* ReloadMontage_Hands;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reload")
+    UAnimMontage* ReloadMontage_Weapon;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Light")
+    UAnimMontage* SwitchLightMontage_ADS;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Light")
+    UAnimMontage* SwitchLightMontage_Hip;
+};
+
+USTRUCT(BlueprintType)
+struct FWeaponAmmoAndUIConfig
+{
+    GENERATED_BODY()
+
+    // ---- 弹药 ----
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+    int32 MaxAmmo = 15; 
+
+    // ---- UI ----
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TArray<UTexture2D*> WeaponIconTextures;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    float CompensatorIconScale = 1.25f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    float SilencerIconScale = 1.5f;
+};
+
 
 UCLASS()
 class ZOMBIETEMPLATE_API AWeaponBase : public AInspectableItem
@@ -99,62 +309,12 @@ public:
 
 #pragma region Fire & Visual FX
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundBase* FireSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundAttenuation* FireSoundAttenuation;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundConcurrency* FireSoundConcurrency;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundBase* ImpactSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundBase* NoImpactSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    UParticleSystem* MuzzleFlashParticle;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleScale = FVector(0.5f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleFlashOffset_Default = FVector(45.0f, 0.0f, 0.0f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleFlashOffset_Compensator = FVector(55.0f, 0.0f, 0.0f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleFlashOffset_Silencer = FVector(65.0f, 0.0f, 0.0f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    UParticleSystem* MuzzleSmokeParticle;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleSmokeScale = FVector(0.25f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleSmokeOffset_Default = FVector(5.0f, 0.0f, 0.0f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleSmokeOffset_Silencer = FVector(20.0f, 0.0f, 0.0f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    FVector MuzzleSmokeOffset_Scope = FVector(10.0f, 0.0f, 0.0f);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Visual")
+    FWeaponVisualFX VisualFX;
 
     // 烟雾粒子池（固定3个组件）
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon Components")
     TArray<UParticleSystemComponent*> MuzzleSmokePool;
-
-    // 池大小
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    int32 MuzzleSmokePoolSize = 3;
-
-    // 烟雾延迟时间（秒），停止开火多久后产生烟雾
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    float SmokeDelay = 0.1f;
 
     // 烟雾延迟触发的定时器
     FTimerHandle SmokeDelayTimer;
@@ -162,11 +322,6 @@ public:
     int32 ConsecutiveShots = 0;                // 连续射击次数
     float LastShotTime = 0.0f;                 // 上次射击时间（秒）
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    float ShotCounterResetTime = 2.0f;        // 计数重置冷却（秒）
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
-    int32 ShotsToStartSmoke = 5;              // 开始产生烟雾的射击次数
 
     // 从池中激活空闲烟雾
     void ActivatePooledSmoke();
@@ -176,28 +331,14 @@ public:
     void OnPooledSmokeFinished(UParticleSystemComponent* PSC);
 
 
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Fire")
-    float FireRange = 10000.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundBase* CaseEjectImpactSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Fire")
-    TEnumAsByte<ECollisionChannel> TraceChannel = ECC_GameTraceChannel1;
-
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Decal")
-    TSubclassOf<AActor> BulletHoleDecalClass;
+    TSubclassOf<AActor> BulletHoleDecalClass;////
 
     FVector GetCurrentMuzzleFlashOffset() const;
     FVector GetCurrentMuzzleSmokeOffset() const;
 
     void FireWeaponVisuals(const FVector& MuzzleLocation, const FRotator& AimRotation, bool bIsAiming, USkeletalMeshComponent* HandsMesh);
     void ProcessHit(const FHitResult& Hit);
-
-    /** 空仓音效（子弹已满或后备不足时播放） */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Audio")
-    USoundBase* EmptyMagSound;
 
 private:
     float LastSmokeTime = 0.0f;   // internal cooldown timer
@@ -224,41 +365,8 @@ public:
 
 #pragma region Recoil & Spread
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Recoil")
-    FVector2D RecoilYaw = FVector2D(-0.5f, 0.5f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Recoil")
-    FVector2D RecoilPitch = FVector2D(-0.7f, 0.2f);
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Recoil")
-    bool bUseRecoil = true;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Spread")
-    float HipBaseSpread = 1.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Spread")
-    float HipMovementSpread = 0.02f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Spread")
-    float ADSBaseSpread = 0.2f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Spread")
-    float ADSMovementSpread = 0.005f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float CompensatorSpreadMultiplier = 0.5f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float CompensatorRecoilMultiplier = 0.7f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float SilencerSpreadMultiplier = 1.1f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float SilencerRecoilMultiplier = 1.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float LaserHipSpreadMultiplier = 0.3f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float LaserADSSpreadMultiplier = 1.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float ScopeADSSpreadMultiplier = 0.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Stats")
+    FWeaponRecoilSpread RecoilSpread;
 
     float GetCurrentHipSpread() const;
     float GetCurrentADSSpread() const;
@@ -275,26 +383,18 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Weapon|Scope")
     bool bScopeEquipped = false;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
+    FWeaponAttachmentConfig AttachmentConfig;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Compensator")
-    USoundBase* CompensatorFireSound;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Compensator")
-    TSubclassOf<AActor> CompensatorDropClass;
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void EquipCompensator();
     void RemoveCompensator();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Silencer")
-    USoundBase* SilencerFireSound;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Silencer")
-    TSubclassOf<AActor> SilencerDropClass;
     UFUNCTION(BlueprintCallable, Category = "Weapon|Silencer")
     void EquipSilencer();
     UFUNCTION(BlueprintCallable, Category = "Weapon|Silencer")
     void RemoveSilencer();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Scope")
-    FVector ArmsLocCorrection = FVector(0.0f, 0.0f, -1.484848f);
     UFUNCTION(BlueprintCallable, Category = "Weapon|Scope")
     void EquipScope();
     UFUNCTION(BlueprintCallable, Category = "Weapon|Scope")
@@ -315,12 +415,6 @@ public:
     UPROPERTY(EditAnywhere, Category = "Weapon|Light")
     bool bDrawLaserDebug = true;
 
-    // ---- 灯光切换蒙太奇 ----
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Light")
-    UAnimMontage* SwitchLightMontage_ADS;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Light")
-    UAnimMontage* SwitchLightMontage_Hip;
 
     // ---- 切换灯光音效 ----
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Light")
@@ -343,24 +437,14 @@ public:
 
 #pragma region Animation Montages
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Fire")
-    UAnimMontage* FireMontage_Hip_Hands;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Fire")
-    UAnimMontage* FireMontage_ADS_Hands;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Fire")
-    UAnimMontage* FireMontage_Weapon;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Animation")
+    FWeaponAnimMontageSet AnimMontageSet;
+
 
 #pragma endregion
 
 #pragma region Reload
 public:
-    /** 手部换弹蒙太奇 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Reload")
-    UAnimMontage* ReloadMontage_Hands;
-
-    /** 武器自身换弹蒙太奇 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Reload")
-    UAnimMontage* ReloadMontage_Weapon;
 
     /** 是否正在换弹 */
     UPROPERTY(BlueprintReadOnly, Category = "Weapon|Reload")
@@ -385,15 +469,6 @@ public:
 
 #pragma region WeaponIcon
 public:
-    // 图标纹理数组，按索引存放所有可能组合的图标
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|UI")
-    TArray<UTexture2D*> WeaponIconTextures;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|UI")
-    float CompensatorIconScale = 1.25f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|UI")
-    float SilencerIconScale = 1.5f;
 
     // 获取图标和缩放的函数（非纯函数，通过引用输出）
     UFUNCTION(BlueprintCallable, Category = "Weapon|UI")
@@ -402,9 +477,8 @@ public:
 
 #pragma region Ammo
     public:
-        /** 最大弹药数 */
-        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Ammo")
-        int32 MaxAmmo = 15;
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Config")
+        FWeaponAmmoAndUIConfig AmmoAndUIConfig;
 
         /** 当前弹药数 */
         UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Ammo")
@@ -429,22 +503,7 @@ public:
 #pragma region Damage
 public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Damage")
-    float Damage = 25.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Damage")
-    TMap<FName, float> BoneDamageMultipliers;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Damage")
-    UCurveFloat* DamageFalloffCurve;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Damage")
-    float MinimumDamage = 0.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Damage")
-    TSubclassOf<UDamageType> DamageTypeClass = UDamageType::StaticClass();
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Attachments")
-    float SilencerDamageMultiplier = 0.8f;
+    FWeaponDamage DamageConfig;
 
     UPROPERTY(BlueprintReadOnly, Category = "Weapon|Damage")
     bool bCanDismember = false;
