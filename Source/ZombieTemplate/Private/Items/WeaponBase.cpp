@@ -93,18 +93,7 @@ AWeaponBase::AWeaponBase()
     FlashlightBeam->SetAttenuationRadius(50000.0f);
     FlashlightBeam->SetOuterConeAngle(25.0f);
 
-    // 创建烟雾粒子池
-    for (int32 i = 0; i < VisualFX.MuzzleSmokePoolSize; ++i)
-    {
-        FString CompName = FString::Printf(TEXT("MuzzleSmoke_%d"), i);
-        UParticleSystemComponent* SmokeComp = CreateDefaultSubobject<UParticleSystemComponent>(*CompName);
-        SmokeComp->SetupAttachment(Weapon_SKMesh, MuzzleSocketName);
-        SmokeComp->bAutoActivate = false;
-        SmokeComp->SetVisibility(true);
-        SmokeComp->SetRelativeLocation(FVector::ZeroVector);
-        SmokeComp->SetRelativeScale3D(VisualFX.MuzzleSmokeScale);
-        MuzzleSmokePool.Add(SmokeComp);
-    }
+   
 
 }
 
@@ -122,9 +111,9 @@ void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) c
     // ========== 计算图标纹理（位掩码 + 回退） ==========
     auto TryGetIcon = [this](int32 Flags) -> UTexture2D*
         {
-            if (AmmoAndUIConfig.WeaponIconTextures.IsValidIndex(Flags))
+            if (WeaponData->AmmoAndUIConfig.WeaponIconTextures.IsValidIndex(Flags))
             {
-                return AmmoAndUIConfig.WeaponIconTextures[Flags];
+                return WeaponData->AmmoAndUIConfig.WeaponIconTextures[Flags];
             }
             return nullptr;
         };
@@ -157,11 +146,11 @@ void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) c
     // ========== 计算缩放 ==========
     if (bCompensatorEquipped)
     {
-        OutScale = AmmoAndUIConfig.CompensatorIconScale;
+        OutScale = WeaponData->AmmoAndUIConfig.CompensatorIconScale;
     }
     else if (bSilencerEquipped)
     {
-        OutScale = AmmoAndUIConfig.SilencerIconScale;
+        OutScale = WeaponData->AmmoAndUIConfig.SilencerIconScale;
     }
     else
     {
@@ -174,7 +163,9 @@ void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) c
 
 void AWeaponBase::OnConstruction(const FTransform& Transform)
 {
+
     Super::OnConstruction(Transform);
+    
 }
 
 // Called when the game starts or when spawned
@@ -184,6 +175,25 @@ void AWeaponBase::BeginPlay()
     InitializeProjectilePool(); // 初始化对象池
     SaveBaseAttributes();
    
+   
+    // 动态创建烟雾粒子池（不能在 BeginPlay 中用 CreateDefaultSubobject）
+    if (WeaponData && Weapon_SKMesh && MuzzleSmokePool.Num() == 0) // 防止重复创建
+    {
+        for (int32 i = 0; i < WeaponData->VisualFX.MuzzleSmokePoolSize; ++i)
+        {
+            FString CompName = FString::Printf(TEXT("MuzzleSmoke_%d"), i);
+            UParticleSystemComponent* SmokeComp = NewObject<UParticleSystemComponent>(this, *CompName);
+            SmokeComp->SetupAttachment(Weapon_SKMesh, MuzzleSocketName);
+            SmokeComp->bAutoActivate = false;
+            SmokeComp->SetRelativeLocation(FVector::ZeroVector);
+            SmokeComp->SetRelativeScale3D(WeaponData->VisualFX.MuzzleSmokeScale);
+            SmokeComp->RegisterComponent();          // 必须注册
+            SmokeComp->SetVisibility(true);
+            MuzzleSmokePool.Add(SmokeComp);
+        }
+    }
+
+
     OriginalDismemberPower = DismemberPower;
 }
 
@@ -273,7 +283,7 @@ void AWeaponBase::EquipCompensator()
     if (bSilencerEquipped) RemoveSilencer(); // 互斥
 
     if (CompensatorMesh) CompensatorMesh->SetVisibility(true);
-    if (AttachmentConfig.CompensatorFireSound) VisualFX.FireSound = AttachmentConfig.CompensatorFireSound;
+    if (WeaponData->AttachmentConfig.CompensatorFireSound) WeaponData->VisualFX.FireSound = WeaponData->AttachmentConfig.CompensatorFireSound;
     bCompensatorEquipped = true;
     bCanDismember = true;   // ← 补偿器开启断肢
 
@@ -285,13 +295,13 @@ void AWeaponBase::RemoveCompensator()
 {
     if (!bCompensatorEquipped) return;
     
-    if (AttachmentConfig.CompensatorDropClass && Weapon_SKMesh)
+    if (WeaponData->AttachmentConfig.CompensatorDropClass && Weapon_SKMesh)
     {
         FVector SpawnLoc = Weapon_SKMesh->GetSocketLocation(MuzzleSocketName);
         FRotator SpawnRot = GetActorRotation();
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        GetWorld()->SpawnActor<AActor>(AttachmentConfig.CompensatorDropClass, SpawnLoc, SpawnRot, SpawnParams);
+        GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.CompensatorDropClass, SpawnLoc, SpawnRot, SpawnParams);
     }
 
     if (CompensatorMesh) CompensatorMesh->SetVisibility(false);
@@ -309,7 +319,7 @@ void AWeaponBase::EquipSilencer()
     if (bCompensatorEquipped) RemoveCompensator();
 
     if (SilencerMesh) SilencerMesh->SetVisibility(true);
-    if (AttachmentConfig.SilencerFireSound) VisualFX.FireSound = AttachmentConfig.SilencerFireSound;
+    if (WeaponData->AttachmentConfig.SilencerFireSound) WeaponData->VisualFX.FireSound = WeaponData->AttachmentConfig.SilencerFireSound;
     bSilencerEquipped = true;
 }
 
@@ -318,13 +328,13 @@ void AWeaponBase::RemoveSilencer()
     
     if (!bSilencerEquipped) return;
 
-    if (AttachmentConfig.SilencerDropClass && Weapon_SKMesh)
+    if (WeaponData->AttachmentConfig.SilencerDropClass && Weapon_SKMesh)
     {
         FVector SpawnLoc = Weapon_SKMesh->GetSocketLocation(MuzzleSocketName);
         FRotator SpawnRot = GetActorRotation();
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        GetWorld()->SpawnActor<AActor>(AttachmentConfig.SilencerDropClass, SpawnLoc, SpawnRot, SpawnParams);
+        GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.SilencerDropClass, SpawnLoc, SpawnRot, SpawnParams);
     }
 
     if (SilencerMesh) SilencerMesh->SetVisibility(false);
@@ -354,31 +364,31 @@ void AWeaponBase::RemoveScope()
 void AWeaponBase::StartReload(int32 AmmoToAdd)
 {
     // 检查状态
-    if (!bIsEquipped || bIsReloading || AmmoToAdd <= 0 || CurrentAmmo >= AmmoAndUIConfig.MaxAmmo) return;
+    if (!bIsEquipped || bIsReloading || AmmoToAdd <= 0 || CurrentAmmo >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
 
     bIsReloading = true;
     PendingReloadAmount = AmmoToAdd;   // 暂存数量，动画结束时使用
 
     // 播放手部换弹蒙太奇
-    if (AnimMontageSet.ReloadMontage_Hands && CachedHandsMesh)
+    if (WeaponData->AnimMontageSet.ReloadMontage_Hands && CachedHandsMesh)
     {
         UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
         if (HandsAnimInst)
         {
-            HandsAnimInst->Montage_Play(AnimMontageSet.ReloadMontage_Hands);
+            HandsAnimInst->Montage_Play(WeaponData->AnimMontageSet.ReloadMontage_Hands);
             FOnMontageEnded EndDelegate;
             EndDelegate.BindUObject(this, &AWeaponBase::OnReloadMontageEnded);
-            HandsAnimInst->Montage_SetEndDelegate(EndDelegate, AnimMontageSet.ReloadMontage_Hands);
+            HandsAnimInst->Montage_SetEndDelegate(EndDelegate, WeaponData->AnimMontageSet.ReloadMontage_Hands);
         }
     }
 
     // 播放武器自身换弹蒙太奇
-    if (AnimMontageSet.ReloadMontage_Weapon && Weapon_SKMesh)
+    if (WeaponData->AnimMontageSet.ReloadMontage_Weapon && Weapon_SKMesh)
     {
         UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
         if (WeaponAnimInst)
         {
-            WeaponAnimInst->Montage_Play(AnimMontageSet.ReloadMontage_Weapon);
+            WeaponAnimInst->Montage_Play(WeaponData->AnimMontageSet.ReloadMontage_Weapon);
         }
     }
 }
@@ -388,21 +398,21 @@ void AWeaponBase::StopReload()
     if (!bIsReloading) return;
     bIsReloading = false;
     // 停止手部蒙太奇
-    if (CachedHandsMesh && AnimMontageSet.ReloadMontage_Hands)
+    if (CachedHandsMesh && WeaponData->AnimMontageSet.ReloadMontage_Hands)
     {
         UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
-        if (HandsAnimInst && HandsAnimInst->Montage_IsPlaying(AnimMontageSet.ReloadMontage_Hands))
+        if (HandsAnimInst && HandsAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Hands))
         {
-            HandsAnimInst->Montage_Stop(0.1f, AnimMontageSet.ReloadMontage_Hands);
+            HandsAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Hands);
         }
     }
     // 停止武器蒙太奇
-    if (Weapon_SKMesh && AnimMontageSet.ReloadMontage_Weapon)
+    if (Weapon_SKMesh && WeaponData->AnimMontageSet.ReloadMontage_Weapon)
     {
         UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
-        if (WeaponAnimInst && WeaponAnimInst->Montage_IsPlaying(AnimMontageSet.ReloadMontage_Weapon))
+        if (WeaponAnimInst && WeaponAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Weapon))
         {
-            WeaponAnimInst->Montage_Stop(0.1f, AnimMontageSet.ReloadMontage_Weapon);
+            WeaponAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Weapon);
         }
     }
 }
@@ -430,7 +440,7 @@ void AWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted)
         }
 
         // 填充武器弹药，确保不超过最大容量
-        CurrentAmmo = FMath::Min(CurrentAmmo + ActualAdded, AmmoAndUIConfig.MaxAmmo);
+        CurrentAmmo = FMath::Min(CurrentAmmo + ActualAdded, WeaponData->AmmoAndUIConfig.MaxAmmo);
         CheckAmmoStateChange();
     }
 
@@ -505,7 +515,7 @@ void AWeaponBase::ToggleFlashlight(bool bIsAiming)
     if (FlashlightBeam) FlashlightBeam->SetVisibility(bFlashlightBeamOn);
 
     // 播放蒙太奇和音效
-    UAnimMontage* Montage = bIsAiming ? AnimMontageSet.SwitchLightMontage_ADS : AnimMontageSet.SwitchLightMontage_Hip;
+    UAnimMontage* Montage = bIsAiming ? WeaponData->AnimMontageSet.SwitchLightMontage_ADS : WeaponData->AnimMontageSet.SwitchLightMontage_Hip;
     if (Montage && CachedHandsMesh)
     {
         UAnimInstance* AnimInst = CachedHandsMesh->GetAnimInstance();
@@ -535,7 +545,7 @@ void AWeaponBase::UpdateLaserTarget()
 
     // 2. 从摄像机发射一条射线（精确无散布），得到准星瞄准点
     FVector TraceStart = CameraLoc;
-    FVector TraceEnd = TraceStart + AimDir * VisualFX.FireRange;
+    FVector TraceEnd = TraceStart + AimDir * WeaponData->VisualFX.FireRange;
 
     FHitResult Hit;
     FCollisionQueryParams QueryParams;
@@ -568,7 +578,7 @@ void AWeaponBase::UpdateLaserTarget()
 void AWeaponBase::GetAmmoInfo(int32& OutCurrent, int32& OutMax) const
 {
     OutCurrent = CurrentAmmo;
-    OutMax = AmmoAndUIConfig.MaxAmmo;
+    OutMax = WeaponData->AmmoAndUIConfig.MaxAmmo;
 }
 
 void AWeaponBase::ConsumeAmmo()
@@ -582,8 +592,8 @@ void AWeaponBase::ConsumeAmmo()
 
 float AWeaponBase::GetCurrentDamage() const
 {
-    float FinalDamage = DamageConfig.Damage;
-    if (bSilencerEquipped)   FinalDamage *= DamageConfig.SilencerDamageMultiplier;
+    float FinalDamage = WeaponData->DamageConfig.Damage;
+    if (bSilencerEquipped)   FinalDamage *= WeaponData->DamageConfig.SilencerDamageMultiplier;
     // 补偿器不直接影响伤害，只负责断肢，可在此扩展
     return FinalDamage;
 }
@@ -601,12 +611,12 @@ void AWeaponBase::CheckAmmoStateChange()
 
 void AWeaponBase::SaveBaseAttributes()
 {
-    OriginalFireSound = VisualFX.FireSound;
+    OriginalFireSound = WeaponData->VisualFX.FireSound;
 }
 
 void AWeaponBase::RestoreBaseAttributes()
 {
-    VisualFX.FireSound = OriginalFireSound;
+    WeaponData->VisualFX.FireSound = OriginalFireSound;
 }
 
 void AWeaponBase::Drop()
@@ -643,7 +653,7 @@ void AWeaponBase::Drop()
 
 void AWeaponBase::ActivatePooledSmoke()
 {
-    if (!bIsEquipped || !VisualFX.MuzzleSmokeParticle) return;
+    if (!bIsEquipped || !WeaponData->VisualFX.MuzzleSmokeParticle) return;
 
     for (UParticleSystemComponent* SmokeComp : MuzzleSmokePool)
     {
@@ -654,7 +664,7 @@ void AWeaponBase::ActivatePooledSmoke()
             // 如果模板未设置，使用武器指定的粒子资产
             if (SmokeComp->Template == nullptr)
             {
-                SmokeComp->SetTemplate(VisualFX.MuzzleSmokeParticle);
+                SmokeComp->SetTemplate(WeaponData->VisualFX.MuzzleSmokeParticle);
             }
             SmokeComp->Activate(true);
             SmokeComp->OnSystemFinished.RemoveDynamic(this, &AWeaponBase::OnPooledSmokeFinished);
@@ -677,16 +687,16 @@ void AWeaponBase::OnPooledSmokeFinished(UParticleSystemComponent* PSC)
 
 FVector AWeaponBase::GetCurrentMuzzleFlashOffset() const
 {
-    if (bSilencerEquipped)      return VisualFX.MuzzleFlashOffset_Silencer;
-    if (bCompensatorEquipped)   return VisualFX.MuzzleFlashOffset_Compensator;
-    return VisualFX.MuzzleFlashOffset_Default;
+    if (bSilencerEquipped)      return WeaponData->VisualFX.MuzzleFlashOffset_Silencer;
+    if (bCompensatorEquipped)   return WeaponData->VisualFX.MuzzleFlashOffset_Compensator;
+    return WeaponData->VisualFX.MuzzleFlashOffset_Default;
 }
 
 FVector AWeaponBase::GetCurrentMuzzleSmokeOffset() const
 {
-    if (bSilencerEquipped)      return VisualFX.MuzzleSmokeOffset_Silencer;
-    if (bScopeEquipped)         return VisualFX.MuzzleSmokeOffset_Scope;
-    return VisualFX.MuzzleSmokeOffset_Default;
+    if (bSilencerEquipped)      return WeaponData->VisualFX.MuzzleSmokeOffset_Silencer;
+    if (bScopeEquipped)         return WeaponData->VisualFX.MuzzleSmokeOffset_Scope;
+    return WeaponData->VisualFX.MuzzleSmokeOffset_Default;
 }
 
 void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotator& AimRotation, bool bIsAiming, USkeletalMeshComponent* HandsMesh)
@@ -694,7 +704,7 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
     if (!Weapon_SKMesh) return;
 
     // 1. 手臂动画
-    UAnimMontage* HandsMontage = bIsAiming ? AnimMontageSet.FireMontage_ADS_Hands : AnimMontageSet.FireMontage_Hip_Hands;
+    UAnimMontage* HandsMontage = bIsAiming ? WeaponData->AnimMontageSet.FireMontage_ADS_Hands : WeaponData->AnimMontageSet.FireMontage_Hip_Hands;
     if (HandsMontage && HandsMesh)
     {
         if (UAnimInstance* AnimInstance = HandsMesh->GetAnimInstance())
@@ -702,23 +712,23 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
     }
 
     // 2. 武器自身动画
-    if (AnimMontageSet.FireMontage_Weapon)
+    if (WeaponData->AnimMontageSet.FireMontage_Weapon)
     {
         if (UAnimInstance* AnimInstance = Weapon_SKMesh->GetAnimInstance())
-            AnimInstance->Montage_Play(AnimMontageSet.FireMontage_Weapon);
+            AnimInstance->Montage_Play(WeaponData->AnimMontageSet.FireMontage_Weapon);
     }
 
     // 3. 枪口火焰
-    if (VisualFX.MuzzleFlashParticle)
+    if (WeaponData->VisualFX.MuzzleFlashParticle)
     {
         FVector ActualFlashOffset = GetCurrentMuzzleFlashOffset();
         UGameplayStatics::SpawnEmitterAttached(
-            VisualFX.MuzzleFlashParticle,
+            WeaponData->VisualFX.MuzzleFlashParticle,
             Weapon_SKMesh,
             MuzzleSocketName,
             ActualFlashOffset,          // 使用动态偏移
             FRotator::ZeroRotator,
-            VisualFX.MuzzleScale,
+            WeaponData->VisualFX.MuzzleScale,
             EAttachLocation::SnapToTarget,
             true
         );
@@ -726,12 +736,12 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
 
 
 // 4. 枪口烟雾（延迟触发 + 对象池）
-    if (VisualFX.MuzzleSmokeParticle)
+    if (WeaponData->VisualFX.MuzzleSmokeParticle)
     {
         float CurrentTime = GetWorld()->GetTimeSeconds();
 
         // 冷却重置：超过 3 秒未射击，计数清零
-        if (CurrentTime - LastShotTime > VisualFX.ShotCounterResetTime)
+        if (CurrentTime - LastShotTime > WeaponData->VisualFX.ShotCounterResetTime)
         {
             ConsecutiveShots = 0;
         }
@@ -739,7 +749,7 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
         LastShotTime = CurrentTime;
         ConsecutiveShots++;
 
-        if (ConsecutiveShots >= VisualFX.ShotsToStartSmoke)
+        if (ConsecutiveShots >= WeaponData->VisualFX.ShotsToStartSmoke)
         {
             ActivatePooledSmoke();  // 内部会根据计数控制烟雾规模
         }
@@ -747,13 +757,13 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
    
 
     // 5. 开火音效
-    if (VisualFX.FireSound)
+    if (WeaponData->VisualFX.FireSound)
     {
         USceneComponent* AttachComp = Weapon_SKMesh ? Weapon_SKMesh : RootComponent;
         UGameplayStatics::SpawnSoundAttached(
-            VisualFX.FireSound, AttachComp, NAME_None, FVector::ZeroVector,
+            WeaponData->VisualFX.FireSound, AttachComp, NAME_None, FVector::ZeroVector,
             EAttachLocation::KeepRelativeOffset, false, 1.0f, 1.0f, 0.0f,
-            VisualFX.FireSoundAttenuation, VisualFX.FireSoundConcurrency, false);
+            WeaponData->VisualFX.FireSoundAttenuation, WeaponData->VisualFX.FireSoundConcurrency, false);
     }
 
     // 6弹壳抛出
@@ -789,19 +799,19 @@ void AWeaponBase::ProcessHit(const FHitResult& Hit)
     if (!Hit.bBlockingHit) return;
 
     // 击中音效
-    if (VisualFX.ImpactSound)
+    if (WeaponData->VisualFX.ImpactSound)
     {
-        UGameplayStatics::PlaySoundAtLocation(GetWorld(), VisualFX.ImpactSound, Hit.ImpactPoint);
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), WeaponData->VisualFX.ImpactSound, Hit.ImpactPoint);
     }
 
     // 弹孔贴花
-    if (VisualFX.BulletHoleDecalClass)
+    if (WeaponData->VisualFX.BulletHoleDecalClass)
     {
         UPrimitiveComponent* HitComp = Hit.Component.Get();
         if (HitComp && (HitComp->IsA<UStaticMeshComponent>()))
         {
             FRotator DecalRotation = Hit.ImpactNormal.Rotation();
-            GetWorld()->SpawnActor<AActor>(VisualFX.BulletHoleDecalClass, Hit.ImpactPoint, DecalRotation);
+            GetWorld()->SpawnActor<AActor>(WeaponData->VisualFX.BulletHoleDecalClass, Hit.ImpactPoint, DecalRotation);
         }
     }
 
@@ -850,38 +860,38 @@ void AWeaponBase::InitializeProjectilePool()
 
 float AWeaponBase::GetCurrentHipSpread() const
 {
-    float Spread = RecoilSpread.HipBaseSpread;
-    if (bCompensatorEquipped) Spread *= RecoilSpread.CompensatorSpreadMultiplier;
-    if (bSilencerEquipped) Spread *= RecoilSpread.SilencerSpreadMultiplier;
+    float Spread = WeaponData->RecoilSpread.HipBaseSpread;
+    if (bCompensatorEquipped) Spread *= WeaponData->RecoilSpread.CompensatorSpreadMultiplier;
+    if (bSilencerEquipped) Spread *= WeaponData->RecoilSpread.SilencerSpreadMultiplier;
     if (!bScopeEquipped) // 激光只在腰射时生效（开镜时通常关闭）
-        Spread *= RecoilSpread.LaserHipSpreadMultiplier;
+        Spread *= WeaponData->RecoilSpread.LaserHipSpreadMultiplier;
     // 瞄准镜本身不直接影响腰射，可以忽略
     return Spread;
 }
 
 float AWeaponBase::GetCurrentADSSpread() const
 {
-    float Spread = RecoilSpread.ADSBaseSpread;
-    if (bCompensatorEquipped) Spread *= RecoilSpread.CompensatorSpreadMultiplier;
-    if (bSilencerEquipped) Spread *= RecoilSpread.SilencerSpreadMultiplier;
-    if (bScopeEquipped) Spread *= RecoilSpread.ScopeADSSpreadMultiplier;
-    if (bScopeEquipped) Spread *= RecoilSpread.LaserADSSpreadMultiplier; // 一般开镜时激光关闭，但保留乘数
+    float Spread = WeaponData->RecoilSpread.ADSBaseSpread;
+    if (bCompensatorEquipped) Spread *= WeaponData->RecoilSpread.CompensatorSpreadMultiplier;
+    if (bSilencerEquipped) Spread *= WeaponData->RecoilSpread.SilencerSpreadMultiplier;
+    if (bScopeEquipped) Spread *= WeaponData->RecoilSpread.ScopeADSSpreadMultiplier;
+    if (bScopeEquipped) Spread *= WeaponData->RecoilSpread.LaserADSSpreadMultiplier; // 一般开镜时激光关闭，但保留乘数
     return Spread;
 }
 
 FVector2D AWeaponBase::GetCurrentRecoilYaw() const
 {
-    FVector2D Yaw = RecoilSpread.RecoilYaw;
-    if (bCompensatorEquipped) Yaw *= RecoilSpread.CompensatorRecoilMultiplier;
-    if (bSilencerEquipped) Yaw *= RecoilSpread.SilencerRecoilMultiplier;
+    FVector2D Yaw = WeaponData->RecoilSpread.RecoilYaw;
+    if (bCompensatorEquipped) Yaw *= WeaponData->RecoilSpread.CompensatorRecoilMultiplier;
+    if (bSilencerEquipped) Yaw *= WeaponData->RecoilSpread.SilencerRecoilMultiplier;
     return Yaw;
 }
 
 FVector2D AWeaponBase::GetCurrentRecoilPitch() const
 {
-    FVector2D Pitch = RecoilSpread.RecoilPitch;
-    if (bCompensatorEquipped) Pitch *= RecoilSpread.CompensatorRecoilMultiplier;
-    if (bSilencerEquipped) Pitch *= RecoilSpread.SilencerRecoilMultiplier;
+    FVector2D Pitch = WeaponData->RecoilSpread.RecoilPitch;
+    if (bCompensatorEquipped) Pitch *= WeaponData->RecoilSpread.CompensatorRecoilMultiplier;
+    if (bSilencerEquipped) Pitch *= WeaponData->RecoilSpread.SilencerRecoilMultiplier;
     return Pitch;
 }
 
