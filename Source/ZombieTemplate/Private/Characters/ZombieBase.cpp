@@ -38,23 +38,25 @@ void AZombieBase::InitializeBoneNames()
     AllChestName.Empty();  // 清空
 
     // 依次追加
-    AllChestName.Append(HitUpperChestNameArr);
-    AllChestName.Append(HitMidChestNameArr);
-    AllChestName.Append(HitLowerChestNameArr);
+    AllChestName.Append(ZombieData->BoneNames.HitUpperChestNameArr);
+    AllChestName.Append(ZombieData->BoneNames.HitMidChestNameArr);
+    AllChestName.Append(ZombieData->BoneNames.HitLowerChestNameArr);
 
     // ---- 处理四肢骨骼 ----
     AllLimbsName.Empty();
 
-    AllLimbsName.Append(HitFullRightHandNameArr);
-    AllLimbsName.Append(HitFullLeftHandNameArr);
-    AllLimbsName.Append(HitFullRightFootNameArr);
-    AllLimbsName.Append(HitFullLeftFootNameArr);
+    AllLimbsName.Append(ZombieData->BoneNames.HitFullRightHandNameArr);
+    AllLimbsName.Append(ZombieData->BoneNames.HitFullLeftHandNameArr);
+    AllLimbsName.Append(ZombieData->BoneNames.HitFullRightFootNameArr);
+    AllLimbsName.Append(ZombieData->BoneNames.HitFullLeftFootNameArr);
 }
 
 // Called when the game starts or when spawned
 void AZombieBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+    check(ZombieData);
 
     if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
     {
@@ -77,8 +79,16 @@ void AZombieBase::BeginPlay()
     SkinnedDecalSampler = FindComponentByClass<USkinnedDecalSampler>();
     SkinnedDecalSampler->SetMeshComponent(TargetDismemberMesh);
 
-   
+    LastSprintTime = -ZombieData->SprintAttackConfig.SprintCooldown;
 
+    if (ZombieData)
+    {
+        HeadBreakBullets = ZombieData->DismemberConfig.HeadBreakBullets;
+        RightArmBreakBullets = ZombieData->DismemberConfig.RightArmBreakBullets;
+        LeftArmBreakBullets = ZombieData->DismemberConfig.LeftArmBreakBullets;
+        RightLegBreakBullets = ZombieData->DismemberConfig.RightLegBreakBullets;
+        LeftLegBreakBullets = ZombieData->DismemberConfig.LeftLegBreakBullets;
+    }
 }
 
 // Called every frame
@@ -97,12 +107,14 @@ void AZombieBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 
 UAnimSequenceBase* AZombieBase::GetIdleAnimation_Implementation() const
 {
-	return Animation_Idle;  // 你的 UPROPERTY
+    if (!ZombieData) return nullptr;
+    return ZombieData->AnimationConfig.Animation_Idle;  // 你的 UPROPERTY
 }
 
 UAnimSequenceBase* AZombieBase::GetWalkAnimation_Implementation() const
 {
-	return Animation_Walk;
+    if (!ZombieData) return nullptr;
+	return ZombieData->AnimationConfig.Animation_Walk;
 }
 
 
@@ -112,8 +124,8 @@ void AZombieBase::SpawnBloodDecal()
         return;
 
     // 从 DecalSize 的 X 和 Y 中随机生成一个贴花大小（蓝图逻辑）
-    float MinSize = DecalSize.X;
-    float MaxSize = DecalSize.Y;
+    float MinSize = ZombieData->DecalConfig.DecalSize.X;
+    float MaxSize = ZombieData->DecalConfig.DecalSize.Y;
     float Size = FMath::FRandRange(MinSize, MaxSize);
 
     // 将法线向量转换为四元数（作为旋转）
@@ -201,11 +213,11 @@ void AZombieBase::CalculateHitDirection()
     double AngleDeg = FMath::RadiansToDegrees(AngleRad);
 
     // 7. 根据角度和叉积判断方向
-    if (AngleDeg <= MiddleAngleThreshold)
+    if (AngleDeg <= ZombieData->HitReactionBase.MiddleAngleThreshold)
     {
         HitDirection = EHitDirection::Front;
     }
-    else if (AngleDeg > BackAngleThreshold)
+    else if (AngleDeg > ZombieData->HitReactionBase.BackAngleThreshold)
     {
         HitDirection = EHitDirection::Back;
     }
@@ -240,11 +252,11 @@ void AZombieBase::CalculateChestStrikePosition()
     double LocalZ = LocalPos.Z;
 
     // 5. 与 SplitArea 比较
-    if (LocalZ < -SplitArea)
+    if (LocalZ < -ZombieData->HitReactionBase.SplitArea)
     {
         E_ChestStrikePosition = EChestStrikePosition::Spine_Left;   // 对应 NewEnumerator0
     }
-    else if (LocalZ > SplitArea)
+    else if (LocalZ > ZombieData->HitReactionBase.SplitArea)
     {
         E_ChestStrikePosition = EChestStrikePosition::Spine_Right;  // 对应 NewEnumerator3
     }
@@ -281,11 +293,11 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
             GoreComp->SpawnPenetratingBloodPool(false, HitLocation, ShotFromDirection, FVector2D(0.5f, 1.5f), 200.0f, 1.0f);
         }
         // 死亡后是否还能断肢由 bDismemberOnDeath 和 DismemberPower 控制
-        if (!bDismemberOnDeath || DismemberPower <= 1) return;
+        if (!ZombieData->DismemberConfig.bDismemberOnDeath || DismemberPower <= 1) return;
     }
 
     FName Bone = HitBoneName;
-    bool bIsHead = (Bone == HeadBoneName);
+    bool bIsHead = (Bone == ZombieData->BoneNames.HeadBoneName);
     bool bShouldDismember = false;
 
      // 扣减计数器
@@ -310,10 +322,10 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
                 return false;
             };
 
-        if (ProcessLimb(RightArmBreakBullets, HitFullRightHandNameArr) ||
-            ProcessLimb(LeftArmBreakBullets, HitFullLeftHandNameArr) ||
-            ProcessLimb(RightLegBreakBullets, HitFullRightFootNameArr) ||
-            ProcessLimb(LeftLegBreakBullets, HitFullLeftFootNameArr))
+        if (ProcessLimb(RightArmBreakBullets, ZombieData->BoneNames.HitFullRightHandNameArr) ||
+            ProcessLimb(LeftArmBreakBullets, ZombieData->BoneNames.HitFullLeftHandNameArr) ||
+            ProcessLimb(RightLegBreakBullets, ZombieData->BoneNames.HitFullRightFootNameArr) ||
+            ProcessLimb(LeftLegBreakBullets, ZombieData->BoneNames.HitFullLeftFootNameArr))
         {
             bShouldDismember = true;
         }
@@ -332,7 +344,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
         }
 
         // 只有头部或腿部断肢才立即死亡；手臂断肢不死亡
-        if (bIsHead || HitFullRightFootNameArr.Contains(Bone) || HitFullLeftFootNameArr.Contains(Bone))
+        if (bIsHead || ZombieData->BoneNames.HitFullRightFootNameArr.Contains(Bone) || ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(Bone))
         {
             HandleDeathFunc(ShotFromDirection);
         }
@@ -353,7 +365,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
             }
 
             // 暴击同样只有头/腿致死
-            if (bIsHead || HitFullRightFootNameArr.Contains(Bone) || HitFullLeftFootNameArr.Contains(Bone))
+            if (bIsHead || ZombieData->BoneNames.HitFullRightFootNameArr.Contains(Bone) || ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(Bone))
             {
                 HandleDeathFunc(ShotFromDirection);
             }
@@ -374,7 +386,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
 
 void AZombieBase::SpawnHeadFragment_Implementation()
 {
-    if (!HeadFragmentClass) return;
+    if (!ZombieData->DismemberConfig.HeadFragmentClass) return;
 
     // 1. 获取骨骼网格组件
     USkeletalMeshComponent* TargetMesh = FindMeshByTag("DismemberMesh");
@@ -394,7 +406,7 @@ void AZombieBase::SpawnHeadFragment_Implementation()
     // 如果你希望将生成的头碎片归属到当前角色，可以设置 Owner = this;
 
     AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
-        HeadFragmentClass,
+        ZombieData->DismemberConfig.HeadFragmentClass,
         SpawnLocation,
         SpawnRotation,
         SpawnParams
@@ -449,7 +461,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
     {
         SpawnBloodDecal();
         
-        FVector Impulse = ShotFromDirection.GetSafeNormal() * ImpulseMagnitude;
+        FVector Impulse = ShotFromDirection.GetSafeNormal() * ZombieData->HitReactionBase.ImpulseMagnitude;
         TWeakObjectPtr<UMeshComponent> HitComponent = Cast<UMeshComponent>(Hit.Component);
         if (HitComponent.IsValid())
         {
@@ -465,7 +477,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
     // 打印当前血量
     if (GEngine && bDebugShowHealth)
     {
-        FString Msg = FString::Printf(TEXT("Health: %.1f / %.1f"), CurrentHealth, MaxHealth);
+        FString Msg = FString::Printf(TEXT("Health: %.1f / %.1f"), CurrentHealth, ZombieData->CombatConfig.MaxHealth);
         GEngine->AddOnScreenDebugMessage(1, 3.0f, FColor::Cyan, Msg);   // Key=1 保证同一条消息覆盖刷新
     }
 
@@ -491,7 +503,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
 
     if (OutIsHitHead)
     {
-        CountBoneHitsAndGetDizzey(HitHeadPlus);
+        CountBoneHitsAndGetDizzey(ZombieData->HitReactionBase.HitHeadPlus);
     }
 
     SpawnBloodDecal();
@@ -502,17 +514,17 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
         UAnimInstance* AnimInst = GetMesh()->GetAnimInstance();
         if (AnimInst)
         {
-            AnimInst->StopAllMontages(MontageBlendOutTime);
+            AnimInst->StopAllMontages(ZombieData->HitReactionBase.MontageBlendOutTime);
 
             // 播放蒙太奇（PlayRate = 1.0, StartingPosition = 0.0）
             AnimInst->Montage_Play(CurrentHitReactionMontage, 1.0f, EMontagePlayReturnType::MontageLength, 0.0f, true);
             FOnMontageBlendingOutStarted BlendOutDelegate;
             BlendOutDelegate.BindUObject(this, &AZombieBase::OnRetreatBlendOut);
-            AnimInst->Montage_SetBlendingOutDelegate(BlendOutDelegate, RetreatMontage);
+            AnimInst->Montage_SetBlendingOutDelegate(BlendOutDelegate, ZombieData->AvoidanceConfig.RetreatMontage);
         }
 
         InHitState = true;
-        ChangeSpeed(HitStateSpeed);
+        ChangeSpeed(ZombieData->MovementConfig.HitStateSpeed);
     }
 
     // 调用父类以保持引擎默认处理（如应用伤害）
@@ -528,7 +540,7 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
     // ---- 判断命中部位 ----
     bool bIsChest = AllChestName.Contains(Bone);
     bool bIsLimbs = AllLimbsName.Contains(Bone);
-    bool bIsHead = (Bone == HeadBoneName);
+    bool bIsHead = (Bone == ZombieData->BoneNames.HeadBoneName);
 
     // ---- 头部 ----
 
@@ -550,28 +562,28 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
         switch (HitDirection)
         {
         case EHitDirection::Front:
-            RightHandArr = &HitFullRightHandMontage_Front;
-            LeftHandArr = &HitFullLeftHandMontage_Front;
-            RightFootArr = &HitFullRightFootMontage_Front;
-            LeftFootArr = &HitFullLeftFootMontage_Front;
+            RightHandArr = &ZombieData->HitMontages.HitFullRightHandMontage_Front;
+            LeftHandArr = &ZombieData->HitMontages.HitFullLeftHandMontage_Front;
+            RightFootArr = &ZombieData->HitMontages.HitFullRightFootMontage_Front;
+            LeftFootArr = &ZombieData->HitMontages.HitFullLeftFootMontage_Front;
             break;
         case EHitDirection::Left:
-            RightHandArr = &HitFullRightHandMontage_Side;
-            LeftHandArr = &HitFullRightHandMontage_Side;
-            RightFootArr = &HitFullRightFootMontage_Side;
-            LeftFootArr = &HitFullRightFootMontage_Side;
+            RightHandArr = &ZombieData->HitMontages.HitFullRightHandMontage_Side;
+            LeftHandArr = &ZombieData->HitMontages.HitFullRightHandMontage_Side;
+            RightFootArr = &ZombieData->HitMontages.HitFullRightFootMontage_Side;
+            LeftFootArr = &ZombieData->HitMontages.HitFullRightFootMontage_Side;
             break;
         case EHitDirection::Right:
-            RightHandArr = &HitFullLeftHandMontage_Side;
-            LeftHandArr = &HitFullLeftHandMontage_Side;
-            RightFootArr = &HitFullLeftFootMontage_Side;
-            LeftFootArr = &HitFullLeftFootMontage_Side;
+            RightHandArr = &ZombieData->HitMontages.HitFullLeftHandMontage_Side;
+            LeftHandArr = &ZombieData->HitMontages.HitFullLeftHandMontage_Side;
+            RightFootArr = &ZombieData->HitMontages.HitFullLeftFootMontage_Side;
+            LeftFootArr = &ZombieData->HitMontages.HitFullLeftFootMontage_Side;
             break;
         case EHitDirection::Back:
-            RightHandArr = &HitFullRightHandMontage_Back;
-            LeftHandArr = &HitFullLeftHandMontage_Back;
-            RightFootArr = &HitFullRightFootMontage_Back;
-            LeftFootArr = &HitFullLeftFootMontage_Back;
+            RightHandArr = &ZombieData->HitMontages.HitFullRightHandMontage_Back;
+            LeftHandArr = &ZombieData->HitMontages.HitFullLeftHandMontage_Back;
+            RightFootArr = &ZombieData->HitMontages.HitFullRightFootMontage_Back;
+            LeftFootArr = &ZombieData->HitMontages.HitFullLeftFootMontage_Back;
             break;
         default:
             OutIsValid = false;
@@ -597,49 +609,49 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
             switch (E_ChestStrikePosition)
             {
             case EChestStrikePosition::Spine_Left:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Front_L,
-                    HitMidChestMontage_Front_L,
-                    HitLowerChestMontage_Front_L);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Front_L,
+                    ZombieData->HitMontages.HitMidChestMontage_Front_L,
+                    ZombieData->HitMontages.HitLowerChestMontage_Front_L);
                 break;
             case EChestStrikePosition::Spine_Right:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Front_R,
-                    HitMidChestMontage_Front_R,
-                    HitLowerChestMontage_Front_R);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Front_R,
+                    ZombieData->HitMontages.HitMidChestMontage_Front_R,
+                    ZombieData->HitMontages.HitLowerChestMontage_Front_R);
                 break;
             case EChestStrikePosition::Spine_Middle:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Front_M,
-                    HitMidChestMontage_Front_M,
-                    HitLowerChestMontage_Front_M);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Front_M,
+                    ZombieData->HitMontages.HitMidChestMontage_Front_M,
+                    ZombieData->HitMontages.HitLowerChestMontage_Front_M);
                 break;
             }
             break;
         case EHitDirection::Right:
-            bSuccess = FindHitChestMontage(HitUpperChestMontage_Side_L,
-                HitMidChestMontage_Side_L,
-                HitLowerChestMontage_Side_L);
+            bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Side_L,
+                ZombieData->HitMontages.HitMidChestMontage_Side_L,
+                ZombieData->HitMontages.HitLowerChestMontage_Side_L);
             break;
         case EHitDirection::Left:
-            bSuccess = FindHitChestMontage(HitUpperChestMontage_Side_R,
-                HitMidChestMontage_Side_R,
-                HitLowerChestMontage_Side_R);
+            bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Side_R,
+                ZombieData->HitMontages.HitMidChestMontage_Side_R,
+                ZombieData->HitMontages.HitLowerChestMontage_Side_R);
             break;
         case EHitDirection::Back:
             switch (E_ChestStrikePosition)
             {
             case EChestStrikePosition::Spine_Left:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Back_L,
-                    HitMidChestMontage_Back_L,
-                    HitLowerChestMontage_Back_L);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Back_L,
+                    ZombieData->HitMontages.HitMidChestMontage_Back_L,
+                    ZombieData->HitMontages.HitLowerChestMontage_Back_L);
                 break;
             case EChestStrikePosition::Spine_Right:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Back_R,
-                    HitMidChestMontage_Back_R,
-                    HitLowerChestMontage_Back_R);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Back_R,
+                    ZombieData->HitMontages.HitMidChestMontage_Back_R,
+                    ZombieData->HitMontages.HitLowerChestMontage_Back_R);
                 break;
             case EChestStrikePosition::Spine_Middle:
-                bSuccess = FindHitChestMontage(HitUpperChestMontage_Back_M,
-                    HitMidChestMontage_Back_M,
-                    HitLowerChestMontage_Back_M);
+                bSuccess = FindHitChestMontage(ZombieData->HitMontages.HitUpperChestMontage_Back_M,
+                    ZombieData->HitMontages.HitMidChestMontage_Back_M,
+                    ZombieData->HitMontages.HitLowerChestMontage_Back_M);
                 break;
             }
             break;
@@ -670,19 +682,19 @@ void AZombieBase::FindDirectionHitHeadReaction(bool& OutIsValid)
     switch (HitDirection)
     {
     case EHitDirection::Front:
-        SelectedArray = &HitHeadMontage_Front;
+        SelectedArray = &ZombieData->HitMontages.HitHeadMontage_Front;
         break;
 
     case EHitDirection::Right:
-        SelectedArray = &HitHeadMontage_Left;
+        SelectedArray = &ZombieData->HitMontages.HitHeadMontage_Left;
         break;
 
     case EHitDirection::Left:
-        SelectedArray = &HitHeadMontage_Right;
+        SelectedArray = &ZombieData->HitMontages.HitHeadMontage_Right;
         break;
 
     case EHitDirection::Back:
-        SelectedArray = &HitHeadMontage_Back;
+        SelectedArray = &ZombieData->HitMontages.HitHeadMontage_Back;
         break;
 
     default:  // None 或其他未定义值
@@ -708,7 +720,7 @@ void AZombieBase::FindDirectionHitHeadReaction(bool& OutIsValid)
 bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand, const TArray<UAnimMontage*>& MT_LeftHand, const TArray<UAnimMontage*>& MT_RightFoot, const TArray<UAnimMontage*>& MT_LeftFoot)
 {
     // 右手
-    if (HitFullRightHandNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitFullRightHandNameArr.Contains(HitBoneName))
     {
         if (!MT_RightHand.IsEmpty())
         {
@@ -719,7 +731,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         return false;
     }
     // 左手
-    if (HitFullLeftHandNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitFullLeftHandNameArr.Contains(HitBoneName))
     {
         if (!MT_LeftHand.IsEmpty())
         {
@@ -730,7 +742,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         return false;
     }
     // 右脚
-    if (HitFullRightFootNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitFullRightFootNameArr.Contains(HitBoneName))
     {
         if (!MT_RightFoot.IsEmpty())
         {
@@ -741,7 +753,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         return false;
     }
     // 左脚
-    if (HitFullLeftFootNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(HitBoneName))
     {
         if (!MT_LeftFoot.IsEmpty())
         {
@@ -758,7 +770,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
 bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMontage, const TArray<UAnimMontage*>& MidChestMontage, const TArray<UAnimMontage*>& LowerChestMontage)
 {
     // 检查是否属于上胸部骨骼组
-    if (HitUpperChestNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitUpperChestNameArr.Contains(HitBoneName))
     {
         if (!UpperChestMontage.IsEmpty())
         {
@@ -769,7 +781,7 @@ bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMon
         return false;
     }
     // 检查是否属于中胸部骨骼组
-    if (HitMidChestNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitMidChestNameArr.Contains(HitBoneName))
     {
         if (!MidChestMontage.IsEmpty())
         {
@@ -780,7 +792,7 @@ bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMon
         return false;
     }
     // 检查是否属于下胸部骨骼组
-    if (HitLowerChestNameArr.Contains(HitBoneName))
+    if (ZombieData->BoneNames.HitLowerChestNameArr.Contains(HitBoneName))
     {
         if (!LowerChestMontage.IsEmpty())
         {
@@ -800,10 +812,10 @@ void AZombieBase::CountBoneHitsAndGetDizzey(int32 Plus)
     HitCountIntoDizzey += Plus;
 
     // 判断是否达到眩晕阈值
-    if (HitCountIntoDizzey >= IntoHeadDizzeyCount)
+    if (HitCountIntoDizzey >= ZombieData->HitReactionBase.IntoHeadDizzeyCount)
     {
         // 设置眩晕蒙太奇
-        CurrentHitReactionMontage = HitInStunned;
+        CurrentHitReactionMontage = ZombieData->HitReactionBase.HitInStunned;
 
         // 重置计数
         HitCountIntoDizzey = 0;
@@ -834,10 +846,10 @@ void AZombieBase::StartChase()
         AIC->Possess(this);
     }
 
-    ChangeSpeed(WalkSpeed);
+    ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
 
     // 启动定时循环
-    GetWorldTimerManager().SetTimer(ChaseTimerHandle, this, &AZombieBase::ChaseTick, ChaseUpdateInterval, true);
+    GetWorldTimerManager().SetTimer(ChaseTimerHandle, this, &AZombieBase::ChaseTick, ZombieData->ChaseConfig.ChaseUpdateInterval, true);
 }
 
 void AZombieBase::StopChase()
@@ -877,30 +889,30 @@ void AZombieBase::ChaseTick()
     float Dist = FVector::Distance(GetActorLocation(), PlayerPawn->GetActorLocation());
 
 
-    if (Dist <= AttackRange && bIsSprintAttacking)
+    if (Dist <= ZombieData->AttackConfig.AttackRange && bIsSprintAttacking)
     {
-        ChangeSpeed(HitStateSpeed);
+        ChangeSpeed(ZombieData->MovementConfig.HitStateSpeed);
     }
 
     // ---- 冲刺攻击判定 ----
     float CurrentTime = GetWorld()->GetTimeSeconds();
-    if (Dist >= SprintMinRange && Dist <= SprintMaxRange &&
-        SprintAttackMontages.Num() > 0 &&
-        CurrentTime - LastSprintTime >= SprintCooldown &&!bIsAttacking &&
-        (CurrentTime - LastRetreatTime >= RetreatCooldown) && !InHitState)
+    if (Dist >= ZombieData->SprintAttackConfig.SprintMinRange && Dist <= ZombieData->SprintAttackConfig.SprintMaxRange &&
+        ZombieData->SprintAttackConfig.SprintAttackMontages.Num() > 0 &&
+        CurrentTime - LastSprintTime >= ZombieData->SprintAttackConfig.SprintCooldown &&!bIsAttacking &&
+        (CurrentTime - LastRetreatTime >= ZombieData->AvoidanceConfig.RetreatCooldown) && !InHitState && ZombieData->SprintAttackConfig.bEnableSprintAttack)
     {
         bIsSprintAttacking = true;
-        ChangeSpeed(SprintSpeed);   // 冲刺速度
+        ChangeSpeed(ZombieData->MovementConfig.SprintSpeed);   // 冲刺速度
         LastSprintTime = CurrentTime;
 
-        int32 RandomIndex = FMath::RandRange(0, SprintAttackMontages.Num() - 1);
-        UAnimMontage* SprintMontage = SprintAttackMontages[RandomIndex];
+        int32 RandomIndex = FMath::RandRange(0, ZombieData->SprintAttackConfig.SprintAttackMontages.Num() - 1);
+        UAnimMontage* SprintMontage = ZombieData->SprintAttackConfig.SprintAttackMontages[RandomIndex];
         if (SprintMontage)
         {
             UAnimInstance* AnimInst = GetMesh()->GetAnimInstance();
             if (AnimInst)
             {
-                AnimInst->StopAllMontages(MontageBlendOutTime);
+                AnimInst->StopAllMontages(ZombieData->HitReactionBase.MontageBlendOutTime);
                 GetCharacterMovement()->bOrientRotationToMovement = false;
                 GetCharacterMovement()->bUseControllerDesiredRotation = true;
                 AIC->K2_SetFocus(PlayerPawn);
@@ -913,15 +925,32 @@ void AZombieBase::ChaseTick()
     
 
     //普通攻击
-    if (Dist <= AttackRange && !bIsSprintAttacking &&  CurrentTime - LastRetreatTime >= RetreatCooldown && !InHitState)
+    if (Dist <= ZombieData->AttackConfig.AttackRange && !bIsSprintAttacking &&  CurrentTime - LastRetreatTime >= ZombieData->AvoidanceConfig.RetreatCooldown && !InHitState)
     {
+
+        const bool bCanLeft = (LeftArmBreakBullets > 0);
+        const bool bCanRight = (RightArmBreakBullets > 0);
+
+        // 如果两只手臂都断了，不发动攻击
+        if (!bCanLeft && !bCanRight)
+        {
+            return;
+        }
+
+        // 决定用哪只手
+        const bool bUseLeft = (bCanLeft && bCanRight) ? FMath::RandBool() : bCanLeft;
+
+        const TArray<UAnimMontage*>& AttackMontages = bUseLeft
+            ? ZombieData->AttackConfig.LeftAttackMontages
+            : ZombieData->AttackConfig.RightAttackMontages;
+
         // 进入攻击范围，尝试攻击
         if (AttackMontages.Num() > 0)
         {
            
             AIC->StopMovement();
             bIsAttacking = true;
-            ChangeSpeed(HitStateSpeed);
+            ChangeSpeed(ZombieData->MovementConfig.HitStateSpeed);
            
 
             int32 RandomIndex = FMath::RandRange(0, AttackMontages.Num() - 1);
@@ -942,14 +971,14 @@ void AZombieBase::ChaseTick()
         return; // 已在范围内，不移动
     }
 
-    if (Dist > ChaseAcceptanceRadius)
+    if (Dist > ZombieData->ChaseConfig.ChaseAcceptanceRadius)
     {
         
         AIC->K2_ClearFocus();
-        ChangeSpeed(WalkSpeed);
+        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
         GetCharacterMovement()->bOrientRotationToMovement = true;
         GetCharacterMovement()->bUseControllerDesiredRotation = false;
-        AIC->MoveToActor(PlayerPawn, ChaseAcceptanceRadius, false, true, true);
+        AIC->MoveToActor(PlayerPawn, ZombieData->ChaseConfig.ChaseAcceptanceRadius, false, true, true);
     }
 
 
@@ -964,18 +993,18 @@ void AZombieBase::OnAnyMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
     if (!Montage) return;
     // 攻击蒙太奇结束
-    if (bIsAttacking && AttackMontages.Contains(Montage))
+    if (bIsAttacking && ZombieData->AttackConfig.AttackMontages.Contains(Montage))
     {
         bIsAttacking = false;
-        ChangeSpeed(WalkSpeed);
+        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
         PlayRetreatToMakeSpace();
 
     }
     // 冲刺攻击蒙太奇结束
-    else if (bIsSprintAttacking && SprintAttackMontages.Contains(Montage))
+    else if (bIsSprintAttacking && ZombieData->SprintAttackConfig.SprintAttackMontages.Contains(Montage))
     {
         bIsSprintAttacking = false;
-        ChangeSpeed(WalkSpeed);
+        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
         PlayRetreatToMakeSpace();
     }
     // 受击蒙太奇结束（如果你也想用这个统一回调）
@@ -983,7 +1012,7 @@ void AZombieBase::OnAnyMontageEnded(UAnimMontage* Montage, bool bInterrupted)
     {
        
         InHitState = false;
-        ChangeSpeed(WalkSpeed);  // 或 RunSpeed，根据你的设计
+        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);  // 或 RunSpeed，根据你的设计
     }
    
     GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -996,8 +1025,8 @@ void AZombieBase::PerformAttackDamage()
     if (bIsDeath) return;
 
     // 对左右手各检测一次
-    CheckAttackHit(AttackSocketLeft);
-    CheckAttackHit(AttackSocketRight);
+    CheckAttackHit(ZombieData->AttackConfig.AttackSocketLeft);
+    CheckAttackHit(ZombieData->AttackConfig.AttackSocketRight);
 }
 
 void AZombieBase::CheckAttackHit(FName SocketName)
@@ -1024,7 +1053,7 @@ void AZombieBase::CheckAttackHit(FName SocketName)
         GetWorld(),
         Start,
         End,
-        AttackTraceRadius,
+        ZombieData->AttackConfig.AttackTraceRadius,
         ETraceTypeQuery::TraceTypeQuery1,
         false,
         IgnoredActors,
@@ -1044,7 +1073,7 @@ void AZombieBase::CheckAttackHit(FName SocketName)
             AlreadyAttackPawn = HitPawn;
             UGameplayStatics::ApplyDamage(
                 HitPawn,
-                AttackDamage,
+                ZombieData->AttackConfig.AttackDamage,
                 GetController(),
                 this,
                 UDamageType::StaticClass()
@@ -1059,7 +1088,7 @@ void AZombieBase::CheckAttackHit(FName SocketName)
 bool AZombieBase::CritSuccess() const
 {
     // 计算概率：CritChance / 100.0
-    double Probability = CritChance / 100.0;
+    double Probability = ZombieData->CombatConfig.CritChance / 100.0;
     // 生成 0~1 随机浮点数
     double RandomValue = FMath::FRand();
     // 如果概率大于随机数，则暴击成功（注意蓝图用 Greater，即 Probability > RandomValue）
@@ -1131,7 +1160,7 @@ void AZombieBase::HandleDeathFunc(FVector InShotFromDirection)
     DestroyComponentByClass(UCharacterMovementComponent::StaticClass());
     //需要更改
     
-    SetLifeSpan(CorpseLifeSpan);
+    SetLifeSpan(ZombieData->CombatConfig.CorpseLifeSpan);
 
     // 11. 禁用 Actor 的 Tick
     SetActorTickEnabled(false);
@@ -1191,7 +1220,7 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
     // 计算射线长度
     UCapsuleComponent* Capsule = GetCapsuleComponent();
     float CapsuleRadius = Capsule ? Capsule->GetScaledCapsuleRadius() : 34.0f;
-    float TraceLength = CapsuleRadius + TraceCheckDistance;
+    float TraceLength = CapsuleRadius + ZombieData->AvoidanceConfig.TraceCheckDistance;
 
     FVector Start = GetActorLocation();
     FRotator Rot(0.0f, Rotate, 0.0f);
@@ -1209,7 +1238,7 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
         this,
         Start,
         End,
-        AvoidanceTraceChannel,
+        ZombieData->AvoidanceConfig.AvoidanceTraceChannel,
         false,
         TArray<AActor*>(),
         EDrawDebugTrace::ForOneFrame,   // 可改为 ForDuration 调试
@@ -1243,7 +1272,7 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
 void AZombieBase::PassiveAvoidanceCheck(float InElbowPushStrength, float InForwardStrength)
 {
    
-    for (float Angle : AvoidanceCheckAngles)
+    for (float Angle : ZombieData->AvoidanceConfig.AvoidanceCheckAngles)
     {
         TraceCheck(Angle, InElbowPushStrength,InForwardStrength);
     }
@@ -1251,7 +1280,7 @@ void AZombieBase::PassiveAvoidanceCheck(float InElbowPushStrength, float InForwa
 
 void AZombieBase::SpeedUp(float InForwardStrength)
 {
-    if (!bEnableSpeedUp) return;
+    if (!ZombieData->AvoidanceConfig.bEnableSpeedUp) return;
 
     // 获取当前速度矢量
     FVector Velocity = GetVelocity();
@@ -1277,18 +1306,18 @@ void AZombieBase::SpeedUp(float InForwardStrength)
 void AZombieBase::PlayRetreatToMakeSpace()
 {
     if (InHitState) return;
-
-    if (RetreatMontage)
+    if (!ZombieData->AvoidanceConfig.bEnableRetreat) return;
+    if (ZombieData->AvoidanceConfig.RetreatMontage)
     {
-        CurrentHitReactionMontage = RetreatMontage;
+        CurrentHitReactionMontage = ZombieData->AvoidanceConfig.RetreatMontage;
         InHitState = true;
         if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
         {
 
-            AnimInst->Montage_Play(RetreatMontage);
+            AnimInst->Montage_Play(ZombieData->AvoidanceConfig.RetreatMontage);
             FOnMontageBlendingOutStarted BlendOutDelegate;
             BlendOutDelegate.BindUObject(this, &AZombieBase::OnRetreatBlendOut);
-            AnimInst->Montage_SetBlendingOutDelegate(BlendOutDelegate, RetreatMontage);
+            AnimInst->Montage_SetBlendingOutDelegate(BlendOutDelegate, ZombieData->AvoidanceConfig.RetreatMontage);
 
         }
     }
