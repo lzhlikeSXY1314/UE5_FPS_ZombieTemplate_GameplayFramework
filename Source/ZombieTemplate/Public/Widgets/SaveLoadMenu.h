@@ -9,6 +9,8 @@
 #include "SaveLoadMenu.generated.h"
 
 class USaveSlotWidget;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLoadAnimationStart);
+
 
 UCLASS()
 class ZOMBIETEMPLATE_API USaveLoadMenu : public UUserWidget
@@ -18,6 +20,8 @@ class ZOMBIETEMPLATE_API USaveLoadMenu : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
     virtual void NativePreConstruct() override;
+
+
 public:
     /** 当前选中的槽位索引（-1 表示未选中） */
     UPROPERTY(BlueprintReadOnly, Category = "SaveMenu")
@@ -49,6 +53,15 @@ public:
 
     /** 存储所有生成的槽位控件 */
     TArray<USaveSlotWidget*> SlotWidgets;
+
+    /** 加载存档完成时触发，蓝图可绑定此委托开始播放动画 */
+    UPROPERTY(BlueprintAssignable, Category = "SaveMenu")
+    FOnLoadAnimationStart OnLoadAnimationStart;
+
+    /** 蓝图在动画结束时调用此函数，以关闭菜单并恢复游戏 */
+    UFUNCTION(BlueprintCallable, Category = "SaveMenu")
+    void FinishLoadAndClose();
+
 private:
     /** 刷新整个槽位列表 */
     void RefreshSlotList();
@@ -66,5 +79,7 @@ private:
     void OnDeleteClicked();
     UFUNCTION()
     void OnCloseClicked();
+
+
 
 };

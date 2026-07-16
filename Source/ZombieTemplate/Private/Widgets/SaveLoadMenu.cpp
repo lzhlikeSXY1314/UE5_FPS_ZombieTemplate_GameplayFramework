@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Widgets/SaveLoadMenu.h"
@@ -8,6 +8,8 @@
 #include "SaveSystem/ZombieSaveGame.h"
 #include <Components/ScrollBoxSlot.h>
 #include <Blueprint/WidgetBlueprintLibrary.h>
+#include "Components/Image.h" 
+#include "TimerManager.h"  
 
 void USaveLoadMenu::NativeConstruct()
 {
@@ -18,15 +20,15 @@ void USaveLoadMenu::NativeConstruct()
     if (DeleteButton) DeleteButton->OnClicked.AddDynamic(this, &USaveLoadMenu::OnDeleteClicked);
     if (CloseButton) CloseButton->OnClicked.AddDynamic(this, &USaveLoadMenu::OnCloseClicked);
 
-    // »ñÈ¡Íæ¼Ò¿ØÖÆÆ÷
+    // è·å–ç©å®¶æ§åˆ¶å™¨
     APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
     if (PC)
     {
-        // ÉèÖÃÊäÈëÄ£Ê½Îª UI Only£¨²»Ëø¶¨Êó±ê£©
+        // è®¾ç½®è¾“å…¥æ¨¡å¼ä¸º UI Onlyï¼ˆä¸é”å®šé¼ æ ‡ï¼‰
         UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(PC, nullptr, EMouseLockMode::DoNotLock, false);
-        // ÔİÍ£ÓÎÏ·
+        // æš‚åœæ¸¸æˆ
         UGameplayStatics::SetGamePaused(GetWorld(), true);
-        // ÏÔÊ¾Êó±ê¹â±ê
+        // æ˜¾ç¤ºé¼ æ ‡å…‰æ ‡
         PC->bShowMouseCursor = true;
     }
 }
@@ -35,14 +37,28 @@ void USaveLoadMenu::NativePreConstruct()
 {
     Super::NativePreConstruct();
 
-    // ±à¼­Æ÷Ô¤ÀÀÊ±Ë¢ĞÂÁĞ±í£¬ÏÔÊ¾Õ¼Î»²ÛÎ»
+    // ç¼–è¾‘å™¨é¢„è§ˆæ—¶åˆ·æ–°åˆ—è¡¨ï¼Œæ˜¾ç¤ºå ä½æ§½ä½
     RefreshSlotList();
+}
+
+void USaveLoadMenu::FinishLoadAndClose()
+{
+    if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+    {
+        PC->SetIgnoreMoveInput(false);
+        PC->SetIgnoreLookInput(false);
+        if (APawn* Pawn = PC->GetPawn())
+        {
+            Pawn->EnableInput(PC);   // æ¢å¤è¾“å…¥ç»‘å®š
+        }
+    }
+
+    OnCloseClicked();
 }
 
 void USaveLoadMenu::RefreshSlotList()
 {
     if (!SlotScrollBox || !SlotWidgetClass) return;
-    SlotScrollBox->ClearChildren();
     SlotScrollBox->ClearChildren();
     SlotWidgets.Empty();
 
@@ -62,7 +78,7 @@ void USaveLoadMenu::RefreshSlotList()
 
         if (!IsDesignTime())
         {
-            // »ñÈ¡²ÛÎ»ĞÅÏ¢£¨¿ÉÄÜÎª nullptr£©
+            // è·å–æ§½ä½ä¿¡æ¯ï¼ˆå¯èƒ½ä¸º nullptrï¼‰
             UZombieSaveGame* SaveData = SaveMgr->GetSlotInfo(SlotNames[i]);
             bool bIsEmpty = (SaveData == nullptr);
             FDateTime Time = bIsEmpty ? FDateTime::Now() : SaveData->SaveTimestamp;
@@ -73,19 +89,32 @@ void USaveLoadMenu::RefreshSlotList()
         SlotScrollBox->AddChild(SlotWidget);
         SlotWidgets.Add(SlotWidget);
 
-        // ÉèÖÃµ×²¿¼ä¸ô
+        // è®¾ç½®åº•éƒ¨é—´éš”
         if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(SlotWidget->Slot))
         {
-            ScrollSlot->SetPadding(SlotPadding); // µ×²¿10ÏñËØ
+            ScrollSlot->SetPadding(SlotPadding); // åº•éƒ¨10åƒç´ 
         }
 
     }
+
+    if (SelectedSlotIndex >= 0 && SelectedSlotIndex < SlotWidgets.Num())
+    {
+        for (int32 i = 0; i < SlotWidgets.Num(); ++i)
+        {
+            if (SlotWidgets[i])
+            {
+                SlotWidgets[i]->SetSelected(i == SelectedSlotIndex);
+            }
+        }
+    }
+
+
 }
 
 void USaveLoadMenu::OnSlotClicked(int32 SlotIndex)
 {
     SelectedSlotIndex = SlotIndex;
-    // ÕâÀï¸üĞÂÑ¡ÖĞÊÓ¾õĞ§¹û£¨ÀıÈç¸Ä±äÑ¡ÖĞ°´Å¥ÑÕÉ«£©
+    // è¿™é‡Œæ›´æ–°é€‰ä¸­è§†è§‰æ•ˆæœï¼ˆä¾‹å¦‚æ”¹å˜é€‰ä¸­æŒ‰é’®é¢œè‰²ï¼‰
     for (int32 i = 0; i < SlotWidgets.Num(); ++i)
     {
         if (SlotWidgets[i])
@@ -103,13 +132,15 @@ void USaveLoadMenu::OnSaveClicked()
     if (SaveMgr)
     {
         SaveMgr->SaveGame(SlotName);
-        RefreshSlotList();   // Ë¢ĞÂÏÔÊ¾Ê±¼ä
+        RefreshSlotList();   // åˆ·æ–°æ˜¾ç¤ºæ—¶é—´
     }
 }
 
 void USaveLoadMenu::OnLoadClicked()
 {
     if (SelectedSlotIndex < 0) return;
+
+
     FString SlotName = FString::Printf(TEXT("Slot%d"), SelectedSlotIndex);
     UZombieSaveManager* SaveMgr = UZombieSaveManager::GetSaveManager(this);
     if (SaveMgr)
@@ -118,10 +149,27 @@ void USaveLoadMenu::OnLoadClicked()
         if (Data)
         {
             APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-            SaveMgr->ApplySaveData(Data, PC);
-            // ¼ÓÔØ³É¹¦ºó¿ÉÒÔ¹Ø±Õ²Ëµ¥
-            OnCloseClicked();
-            /*RemoveFromParent();*/
+            SaveMgr->ApplySaveData(Data, PC);   // ä¸–ç•Œå·²æ¢å¤
+
+            if (PC)
+            {
+                // åˆ‡æ¢åˆ° GameOnly æ¨¡å¼ï¼ˆéšè—é¼ æ ‡ï¼‰ï¼Œä¸åˆ·æ–°è¾“å…¥ï¼Œé¿å…æ¸…ç©º UI
+                UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC, false);
+                // æ¢å¤æ¸¸æˆè¿è¡Œï¼ˆè®©åŠ¨ç”»å¯ä»¥æ’­æ”¾ï¼‰
+                UGameplayStatics::SetGamePaused(GetWorld(), false);
+                // æ˜¾å¼éšè—é¼ æ ‡ï¼ˆä¿é™©ï¼‰
+                PC->bShowMouseCursor = false;
+
+                PC->SetIgnoreMoveInput(true);
+                PC->SetIgnoreLookInput(true);
+                if (APawn* Pawn = PC->GetPawn())
+                {
+                    Pawn->DisableInput(PC);   // ç¦ç”¨æ‰€æœ‰è¾“å…¥ç»‘å®š
+                }
+            }
+
+
+            OnLoadAnimationStart.Broadcast();
         }
     }
 }
@@ -140,17 +188,18 @@ void USaveLoadMenu::OnDeleteClicked()
 
 void USaveLoadMenu::OnCloseClicked()
 {
-    // »ñÈ¡Íæ¼Ò¿ØÖÆÆ÷
+    // è·å–ç©å®¶æ§åˆ¶å™¨
     APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
     if (PC)
     {
-        // ÉèÖÃÊäÈëÄ£Ê½Îª½öÓÎÏ·
+        // è®¾ç½®è¾“å…¥æ¨¡å¼ä¸ºä»…æ¸¸æˆ
         UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC, true);
-        // È¡ÏûÔİÍ£ÓÎÏ·
+        // å–æ¶ˆæš‚åœæ¸¸æˆ
         UGameplayStatics::SetGamePaused(GetWorld(), false);
-        // Òş²ØÊó±ê¹â±ê
+        // éšè—é¼ æ ‡å…‰æ ‡
         PC->bShowMouseCursor = false;
     }
 
     RemoveFromParent();
 }
+

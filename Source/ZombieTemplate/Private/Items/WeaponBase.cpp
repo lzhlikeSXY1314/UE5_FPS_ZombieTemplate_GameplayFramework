@@ -153,6 +153,7 @@ void AWeaponBase::RestoreState_Implementation(const FActorSaveData& Data)
     bFlashlightBeamOn = Data.bFlashlightBeamOn;
 
     bCanDismember = Data.bCompensatorEquipped;
+ 
 
     if (!Data.bEquipped)  SetActorTransform(Data.WorldTransform);
 
@@ -198,7 +199,11 @@ void AWeaponBase::ResetToDefault_Implementation()
 void AWeaponBase::RefreshAttachmentVisuals()
 {
     if (CompensatorMesh)
+    {
         CompensatorMesh->SetVisibility(bCompensatorEquipped);
+        DismemberPower = CompensatorDismemberPower;
+        
+    }
     if (SilencerMesh)
         SilencerMesh->SetVisibility(bSilencerEquipped);
     if (ScopeMesh)

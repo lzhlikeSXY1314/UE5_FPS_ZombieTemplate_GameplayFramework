@@ -6,6 +6,7 @@
 #include "Interface/ZombieAnimationProvider.h"
 #include <Components/TimelineComponent.h>
 #include <Datas/ZombieData.h>
+#include "SaveSystem/SaveableActor.h"
 #include "ZombieBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeath, bool, Death);
@@ -28,7 +29,7 @@ enum class EChestStrikePosition : uint8
 };
 
 UCLASS()
-class ZOMBIETEMPLATE_API AZombieBase : public ACharacter, public IZombieAnimationProvider
+class ZOMBIETEMPLATE_API AZombieBase : public ACharacter, public IZombieAnimationProvider, public ISaveableActor
 {
     GENERATED_BODY()
 
@@ -42,6 +43,13 @@ public:
     FOnDeath OnDeath;
 
     USkeletalMeshComponent* TargetDismemberMesh = nullptr;
+
+    //----------´æµµ½Ó¿Ú----------//
+    virtual FName GetUniqueSaveID_Implementation() const override;
+    virtual FActorSaveData GetSaveData_Implementation() const override;
+    virtual void RestoreState_Implementation(const FActorSaveData& Data) override;
+    virtual void ResetToDefault_Implementation() override;
+
 
 protected:
     virtual void BeginPlay() override;
@@ -75,6 +83,8 @@ public:
 
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Dismember")
     void SpawnHeadFragment();
+
+    bool HasBreakHead = false;
 
     UFUNCTION(BlueprintCallable, Category = "Dismember")
     USkeletalMeshComponent* FindMeshByTag(FName Tag);

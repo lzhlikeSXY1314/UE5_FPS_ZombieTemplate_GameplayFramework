@@ -31,6 +31,28 @@ struct FActorSaveData
     UPROPERTY()
     int32 CurrentAmmo = 0;        // 弹药数（武器专用，其他Actor可忽略）
 
+    // 丧尸专用字段
+    UPROPERTY()
+    float Health = 100.0f;
+
+    UPROPERTY()
+    bool bIsDead = false;
+
+    UPROPERTY()
+    int32 HeadBreakBullets = 4;
+    UPROPERTY()
+    int32 RightArmBreakBullets = 3;
+    UPROPERTY()
+    int32 LeftArmBreakBullets = 3;
+    UPROPERTY()
+    int32 RightLegBreakBullets = 3;
+    UPROPERTY()
+    int32 LeftLegBreakBullets = 3;
+
+    // 已断肢的骨骼名称列表（用于恢复隐藏骨骼和生成断肢模型）
+    UPROPERTY()
+    TArray<FName> DismemberedBones;
+
     // 武器配件状态
     UPROPERTY()
     bool bCompensatorEquipped = false;

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Characters/ZombieBase.h"
@@ -21,6 +21,7 @@
 
 #include <Characters/ZombiePlayer.h>
 
+#include "Items/WeaponBase.h"
 
 // Sets default values
 AZombieBase::AZombieBase()
@@ -34,21 +35,200 @@ AZombieBase::AZombieBase()
 
 void AZombieBase::InitializeBoneNames()
 {
-    // ---- ´¦ÀíĞØ²¿¹Ç÷À ----
-    AllChestName.Empty();  // Çå¿Õ
+    // ---- å¤„ç†èƒ¸éƒ¨éª¨éª¼ ----
+    AllChestName.Empty();  // æ¸…ç©º
 
-    // ÒÀ´Î×·¼Ó
+    // ä¾æ¬¡è¿½åŠ 
     AllChestName.Append(ZombieData->BoneNames.HitUpperChestNameArr);
     AllChestName.Append(ZombieData->BoneNames.HitMidChestNameArr);
     AllChestName.Append(ZombieData->BoneNames.HitLowerChestNameArr);
 
-    // ---- ´¦ÀíËÄÖ«¹Ç÷À ----
+    // ---- å¤„ç†å››è‚¢éª¨éª¼ ----
     AllLimbsName.Empty();
 
     AllLimbsName.Append(ZombieData->BoneNames.HitFullRightHandNameArr);
     AllLimbsName.Append(ZombieData->BoneNames.HitFullLeftHandNameArr);
     AllLimbsName.Append(ZombieData->BoneNames.HitFullRightFootNameArr);
     AllLimbsName.Append(ZombieData->BoneNames.HitFullLeftFootNameArr);
+}
+
+FName AZombieBase::GetUniqueSaveID_Implementation() const
+{
+    return GetFName();
+}
+
+FActorSaveData AZombieBase::GetSaveData_Implementation() const
+{
+    FActorSaveData Data;
+    Data.ActorID = GetUniqueSaveID_Implementation();
+    Data.ActorClassPath = GetClass()->GetPathName();
+    Data.WorldTransform = GetActorTransform();
+
+    // ä¸§å°¸ç‰¹æœ‰çŠ¶æ€
+    Data.Health = CurrentHealth;
+    Data.bIsDead = bIsDeath;
+    Data.HeadBreakBullets = HeadBreakBullets;
+    Data.RightArmBreakBullets = RightArmBreakBullets;
+    Data.LeftArmBreakBullets = LeftArmBreakBullets;
+    Data.RightLegBreakBullets = RightLegBreakBullets;
+    Data.LeftLegBreakBullets = LeftLegBreakBullets;
+
+    // ä¿å­˜æ–­è‚¢æ•°æ®ï¼šä» DismembermentComponent è·å–å·²åˆ‡æ–­çš„éª¨éª¼åˆ—è¡¨
+    UDismembermentComponent* DismemberComp = FindComponentByClass<UDismembermentComponent>();
+    if (DismemberComp)
+    {
+        // MissingLimbs æ˜¯ä¸€ä¸ª TMap<FName, USkeletalMeshComponent*>ï¼Œé”®æ˜¯éª¨éª¼å
+        DismemberComp->MissingLimbs.GetKeys(Data.DismemberedBones);
+    }
+
+    return Data;
+}
+
+void AZombieBase::RestoreState_Implementation(const FActorSaveData& Data)
+{
+    // 1. æ¢å¤ä½ç½®
+    SetActorTransform(Data.WorldTransform);
+
+    // 2. èº«ä½“å®Œå…¨é‡ç½®åˆ°å®Œæ•´çŠ¶æ€ï¼ˆæ˜¾ç¤ºå…¨éƒ¨éª¨éª¼ã€é‡å»ºç‰©ç†ç­‰ï¼‰
+    ResetToDefault_Implementation();
+
+    // 3. è¦†ç›–è¡€é‡å’Œè®¡æ•°å™¨ä¸ºå­˜æ¡£å€¼
+    CurrentHealth = Data.Health;
+    HeadBreakBullets = Data.HeadBreakBullets;
+    RightArmBreakBullets = Data.RightArmBreakBullets;
+    LeftArmBreakBullets = Data.LeftArmBreakBullets;
+    RightLegBreakBullets = Data.RightLegBreakBullets;
+    LeftLegBreakBullets = Data.LeftLegBreakBullets;
+
+    // 4. æ ¹æ®å­˜æ¡£æ•°æ®éšè—æ–­è‚¢éª¨éª¼ï¼ˆåªéšè—ï¼Œä¸ç”Ÿæˆæ–­è‚¢ç»„ä»¶ï¼‰
+    UDismembermentComponent* DismemberComp = FindComponentByClass<UDismembermentComponent>();
+    if (DismemberComp)
+    {
+        // å…ˆæŠŠ ResetToDefault æ¸…ç©ºçš„ MissingLimbs æ¢å¤ä¸ºå­˜æ¡£ä¸­çš„æ–­è‚¢è®°å½•
+        for (const FName& Bone : Data.DismemberedBones)
+        {
+            // æ˜ å°„åˆ° nullptrï¼Œå› ä¸ºæ–­è‚¢ç»„ä»¶å·²ç»ä¸å­˜åœ¨äº†ï¼Œä½†éœ€è¦è¿™ä¸ªé”®æ¥é˜»æ­¢å†æ¬¡æ–­è‚¢
+            DismemberComp->MissingLimbs.Add(Bone, nullptr);
+            // éšè—è¯¥éª¨éª¼ï¼Œå®ç°æ–­è‚¢è§†è§‰æ•ˆæœ
+            TargetDismemberMesh->HideBoneByName(Bone, PBO_None);
+        }
+    }
+
+    if (HeadBreakBullets <= 0 && HasBreakHead)
+    {
+        TargetDismemberMesh->HideBoneByName(TEXT("head"), PBO_None);
+    }
+
+    // 5. æ ¹æ®æ­»äº¡æ ‡å¿—æ‰§è¡Œæœ€ç»ˆå¤„ç†
+    if (Data.bIsDead)
+    {
+        bIsDeath = false;   // ç¡®ä¿ HandleDeathFunc èƒ½è¿›å…¥
+        HandleDeathFunc(FVector::ZeroVector);
+    }
+    // å­˜æ´»çŠ¶æ€å·²ç”± ResetToDefault å¤„ç†å®Œæ¯•ï¼Œéª¨éª¼å·²è¢«éšè—
+}
+
+void AZombieBase::ResetToDefault_Implementation()
+{
+    // æ¸…ç†æ‰€æœ‰åŠ¨æ€ç”Ÿæˆçš„æ–­è‚¢ç»„ä»¶
+    TArray<USkeletalMeshComponent*> AttachedComponents;
+    GetComponents<USkeletalMeshComponent>(AttachedComponents);
+    for (USkeletalMeshComponent* Comp : AttachedComponents)
+    {
+        if (Comp && Comp->ComponentTags.Contains(TEXT("Dismembered Limb")))
+        {
+            Comp->DestroyComponent();
+        }
+    }
+
+    // æ¸…ç©º MissingLimbs
+    if (UDismembermentComponent* DismemberComp = FindComponentByClass<UDismembermentComponent>())
+    {
+        DismemberComp->MissingLimbs.Empty();
+    }
+
+    // é‡ç½®ä¸»è§’ TargetDismemberMesh
+    if (TargetDismemberMesh)
+    {
+        // å…³é—­ç‰©ç†æ¨¡æ‹Ÿ
+        TargetDismemberMesh->SetSimulatePhysics(false);
+
+        // æ˜¾ç¤ºå…¨éƒ¨éª¨éª¼ï¼ˆå–æ¶ˆéšè—ï¼‰
+        TArray<FName> BoneNames;
+        TargetDismemberMesh->GetBoneNames(BoneNames);
+        for (const FName& Bone : BoneNames)
+        {
+            TargetDismemberMesh->UnHideBoneByName(Bone);
+        }
+
+        // é‡å»ºç‰©ç†çº¦æŸï¼ˆä¿®å¤ BreakConstraint é€ æˆçš„æ–­è£‚ï¼‰
+        TargetDismemberMesh->SetPhysicsAsset(TargetDismemberMesh->GetPhysicsAsset(), true);
+
+        // é‡æ–°é™„ç€åˆ°èƒ¶å›Šä½“ï¼ˆæ­»äº¡æ—¶è¢«åˆ†ç¦»äº†ï¼‰
+        TargetDismemberMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+        //TargetDismemberMesh->SetRelativeLocation(FVector(0, 0, -90));
+        //TargetDismemberMesh->SetRelativeRotation(FRotator(0, -90, 0));
+
+        // æ¢å¤åŠ¨ç”»è“å›¾
+        if (TargetDismemberMesh != GetMesh())
+        {
+            GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+        }
+        GetMesh()->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+        GetMesh()->SetRelativeLocation(FVector(0, 0, -90));
+        GetMesh()->SetRelativeRotation(FRotator(0, -90, 0));
+        TargetDismemberMesh->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+
+        // é‡æ–°ç»‘å®šè’™å¤ªå¥‡ç»“æŸå›è°ƒï¼ˆæ­»äº¡åˆ†ç¦»åä¸¢å¤±ï¼‰
+        if (UAnimInstance* AnimInst = TargetDismemberMesh->GetAnimInstance())
+        {
+            AnimInst->OnMontageEnded.AddDynamic(this, &AZombieBase::OnAnyMontageEnded);
+        }
+
+        // è®¾ç½®ç¢°æ’
+        TargetDismemberMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        TargetDismemberMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+    }
+
+    // é‡ç½®è¡€é‡ã€è®¡æ•°å™¨ã€è¡Œä¸ºæ ‡å¿—
+    if (ZombieData)
+    {
+        CurrentHealth = ZombieData->CombatConfig.MaxHealth;
+        HeadBreakBullets = ZombieData->DismemberConfig.HeadBreakBullets;
+        RightArmBreakBullets = ZombieData->DismemberConfig.RightArmBreakBullets;
+        LeftArmBreakBullets = ZombieData->DismemberConfig.LeftArmBreakBullets;
+        RightLegBreakBullets = ZombieData->DismemberConfig.RightLegBreakBullets;
+        LeftLegBreakBullets = ZombieData->DismemberConfig.LeftLegBreakBullets;
+    }
+
+    bIsDeath = false;
+    bChasePlayer = false;
+    bIsAttacking = false;
+    bIsSprintAttacking = false;
+    InHitState = false;
+    AlreadyAttackPawn = nullptr;
+
+    // æ¢å¤ç§»åŠ¨
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+    {
+        MoveComp->SetMovementMode(MOVE_Walking);
+        MoveComp->Activate();
+        MoveComp->Velocity = FVector::ZeroVector;
+    }
+
+    // æ¢å¤èƒ¶å›Šä½“ç¢°æ’
+    if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+        Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+    // æ¸…é™¤æ®‹ç•™å®šæ—¶å™¨
+    if (GetWorldTimerManager().IsTimerActive(ChaseTimerHandle))
+        GetWorldTimerManager().ClearTimer(ChaseTimerHandle);
+
+    // é‡æ–°å¼€å§‹è¿½å‡»
+    if (ZombieData)
+        StartChase();
+
+    SetActorTickEnabled(true);
 }
 
 // Called when the game starts or when spawned
@@ -63,15 +243,15 @@ void AZombieBase::BeginPlay()
         AnimInst->OnMontageEnded.AddDynamic(this, &AZombieBase::OnAnyMontageEnded);
     }
 
-    // ÓÅÏÈÓÃ±êÇ©²éÕÒ£¬·ñÔò»ØÍËµ½Ä¬ÈÏ Mesh
+    // ä¼˜å…ˆç”¨æ ‡ç­¾æŸ¥æ‰¾ï¼Œå¦åˆ™å›é€€åˆ°é»˜è®¤ Mesh
     TargetDismemberMesh = FindMeshByTag("DismemberMesh");
     if (!TargetDismemberMesh) TargetDismemberMesh = GetMesh();
 
-    // ²éÕÒ GoreComponent
+    // æŸ¥æ‰¾ GoreComponent
     UGoreComponent* GoreComp = FindComponentByClass<UGoreComponent>();
     if (GoreComp && TargetDismemberMesh)
     {
-        // ÉèÖÃÖ«½âÄ¿±ê
+        // è®¾ç½®è‚¢è§£ç›®æ ‡
         GoreComp->SetSkeletalMeshComponentToDismember(TargetDismemberMesh);
     }
     InitializeBoneNames();
@@ -108,7 +288,7 @@ void AZombieBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 UAnimSequenceBase* AZombieBase::GetIdleAnimation_Implementation() const
 {
     if (!ZombieData) return nullptr;
-    return ZombieData->AnimationConfig.Animation_Idle;  // ÄãµÄ UPROPERTY
+    return ZombieData->AnimationConfig.Animation_Idle;  // ä½ çš„ UPROPERTY
 }
 
 UAnimSequenceBase* AZombieBase::GetWalkAnimation_Implementation() const
@@ -123,50 +303,50 @@ void AZombieBase::SpawnBloodDecal()
     if (!SkinnedDecalSampler)
         return;
 
-    // ´Ó DecalSize µÄ X ºÍ Y ÖĞËæ»úÉú³ÉÒ»¸öÌù»¨´óĞ¡£¨À¶Í¼Âß¼­£©
+    // ä» DecalSize çš„ X å’Œ Y ä¸­éšæœºç”Ÿæˆä¸€ä¸ªè´´èŠ±å¤§å°ï¼ˆè“å›¾é€»è¾‘ï¼‰
     float MinSize = ZombieData->DecalConfig.DecalSize.X;
     float MaxSize = ZombieData->DecalConfig.DecalSize.Y;
     float Size = FMath::FRandRange(MinSize, MaxSize);
 
-    // ½«·¨ÏßÏòÁ¿×ª»»ÎªËÄÔªÊı£¨×÷ÎªĞı×ª£©
+    // å°†æ³•çº¿å‘é‡è½¬æ¢ä¸ºå››å…ƒæ•°ï¼ˆä½œä¸ºæ—‹è½¬ï¼‰
     FQuat Rotation = HitNormal.Rotation().Quaternion();
 
-    // µ÷ÓÃ SpawnDecal
+    // è°ƒç”¨ SpawnDecal
     SkinnedDecalSampler->SpawnDecal(
         HitLocation,           // Location
         Rotation,              // Rotation (Quat)
         HitBoneName,           // BoneName
         Size,                  // Size
-        0,                     // SubUV (Ä¬ÈÏÎª0)
-        -1                     // Index (Ä¬ÈÏÎª-1)
+        0,                     // SubUV (é»˜è®¤ä¸º0)
+        -1                     // Index (é»˜è®¤ä¸º-1)
     );
 }
 
 void AZombieBase::InitializeDecalComponent()
 {
-    // 1. »ñÈ¡½ÇÉ«µÄÖ÷ Mesh£¨¶ÔÓ¦À¶Í¼µÄ self.Mesh£©
+    // 1. è·å–è§’è‰²çš„ä¸» Meshï¼ˆå¯¹åº”è“å›¾çš„ self.Meshï¼‰
     if (!GetOwner()) return;
     USkeletalMeshComponent* OwnerMesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
     if (!OwnerMesh) return;
 
-    // 2. »ñÈ¡ Mesh µÄÖ±½Ó×Ó×é¼ş£¨¶ÔÓ¦ GetChildrenComponents(false)£©
+    // 2. è·å– Mesh çš„ç›´æ¥å­ç»„ä»¶ï¼ˆå¯¹åº” GetChildrenComponents(false)ï¼‰
     TArray<USceneComponent*> SkMChildren;
     OwnerMesh->GetChildrenComponents(false, SkMChildren);
 
-    // 3. ±éÀú×Ó×é¼ş
+    // 3. éå†å­ç»„ä»¶
     for (USceneComponent* Child : SkMChildren)
     {
-        // 4. ³¢ÊÔ×ª»»Îª¹Ç÷ÀÍø¸ñ×é¼ş£¨¶ÔÓ¦ DynamicCast£©
+        // 4. å°è¯•è½¬æ¢ä¸ºéª¨éª¼ç½‘æ ¼ç»„ä»¶ï¼ˆå¯¹åº” DynamicCastï¼‰
         USkeletalMeshComponent* SkelMeshChild = Cast<USkeletalMeshComponent>(Child);
         if (!SkelMeshChild) continue;
 
-        // 5. ¼ì²éÊÇ·ñº¬ÓĞ "DecalTarget" ±êÇ©
+        // 5. æ£€æŸ¥æ˜¯å¦å«æœ‰ "DecalTarget" æ ‡ç­¾
         if (!SkelMeshChild->ComponentHasTag(FName("DecalTarget"))) continue;
 
-        // 6. ×¢²áµ½ SkinnedDecalSampler
+        // 6. æ³¨å†Œåˆ° SkinnedDecalSampler
         if (SkinnedDecalSampler)
         {
-            SkinnedDecalSampler->SetMeshComponent(SkelMeshChild, false); // false = ²»ÊÇÖ÷Íø¸ñµÄ×Ó¼¶£¿
+            SkinnedDecalSampler->SetMeshComponent(SkelMeshChild, false); // false = ä¸æ˜¯ä¸»ç½‘æ ¼çš„å­çº§ï¼Ÿ
         }
         break;
     }
@@ -174,7 +354,7 @@ void AZombieBase::InitializeDecalComponent()
 
 void AZombieBase::CalculateHitDirection()
 {
-    // 1. »ñÈ¡Éä»÷·½ÏòÔÚË®Æ½ÃæÉÏµÄÍ¶Ó°£¨ºöÂÔ Z£©
+    // 1. è·å–å°„å‡»æ–¹å‘åœ¨æ°´å¹³é¢ä¸Šçš„æŠ•å½±ï¼ˆå¿½ç•¥ Zï¼‰
     FVector ShotDir = ShotFromDirection;
     ShotDir.Z = 0.0f;
     if (ShotDir.IsNearlyZero())
@@ -183,36 +363,36 @@ void AZombieBase::CalculateHitDirection()
         return;
     }
 
-    // 2. »ñÈ¡½ÇÉ«Ç°·½ÏòÔÚË®Æ½ÃæÉÏµÄÍ¶Ó°
+    // 2. è·å–è§’è‰²å‰æ–¹å‘åœ¨æ°´å¹³é¢ä¸Šçš„æŠ•å½±
     FRotator ActorRot = GetActorRotation();
     FVector Forward = UKismetMathLibrary::GetForwardVector(ActorRot);
     Forward.Z = 0.0f;
     Forward.Normalize();
 
-    // 3. ¼ÆËã¶şÎ¬ÏòÁ¿
+    // 3. è®¡ç®—äºŒç»´å‘é‡
     FVector2D VecA(ShotDir.X, ShotDir.Y);
     FVector2D VecB(Forward.X, Forward.Y);
 
-    // 4. ¼ì²éÊÇ·ñÁãÏòÁ¿£¨±£ÏÕ£©
+    // 4. æ£€æŸ¥æ˜¯å¦é›¶å‘é‡ï¼ˆä¿é™©ï¼‰
     if (VecA.IsNearlyZero() || VecB.IsNearlyZero())
     {
         HitDirection = EHitDirection::Front;
         return;
     }
 
-    // 5. ¼ÆËãµã»ı¡¢²æ»ı¡¢³¤¶È
+    // 5. è®¡ç®—ç‚¹ç§¯ã€å‰ç§¯ã€é•¿åº¦
     double Dot = FVector2D::DotProduct(VecA, VecB);
     double Cross = FVector2D::CrossProduct(VecA, VecB);
     double MagA = VecA.Size();
     double MagB = VecB.Size();
 
-    // 6. ¼ÆËã¼Ğ½Ç
+    // 6. è®¡ç®—å¤¹è§’
     double CosTheta = Dot / (MagA * MagB);
     CosTheta = FMath::Clamp(CosTheta, -1.0, 1.0);
     double AngleRad = FMath::Acos(CosTheta);
     double AngleDeg = FMath::RadiansToDegrees(AngleRad);
 
-    // 7. ¸ù¾İ½Ç¶ÈºÍ²æ»ıÅĞ¶Ï·½Ïò
+    // 7. æ ¹æ®è§’åº¦å’Œå‰ç§¯åˆ¤æ–­æ–¹å‘
     if (AngleDeg <= ZombieData->HitReactionBase.MiddleAngleThreshold)
     {
         HitDirection = EHitDirection::Front;
@@ -221,7 +401,7 @@ void AZombieBase::CalculateHitDirection()
     {
         HitDirection = EHitDirection::Back;
     }
-    else if (Cross > 0.0)   // ²æ»ı > 0 ±íÊ¾ÓÒ²à
+    else if (Cross > 0.0)   // å‰ç§¯ > 0 è¡¨ç¤ºå³ä¾§
     {
         HitDirection = EHitDirection::Right;
     }
@@ -234,35 +414,35 @@ void AZombieBase::CalculateHitDirection()
 
 void AZombieBase::CalculateChestStrikePosition()
 {
-    // 1. »ñÈ¡ Mesh ×é¼ş
+    // 1. è·å– Mesh ç»„ä»¶
     USkeletalMeshComponent* MeshComp = GetMesh();
     if (!MeshComp)
     {
-        E_ChestStrikePosition = EChestStrikePosition::Spine_Left;  // Ä¬ÈÏ
+        E_ChestStrikePosition = EChestStrikePosition::Spine_Left;  // é»˜è®¤
         return;
     }
 
-    // 2. »ñÈ¡ spine_02 ¹Ç÷ÀµÄÊÀ½ç±ä»»
+    // 2. è·å– spine_02 éª¨éª¼çš„ä¸–ç•Œå˜æ¢
     FTransform SpineTransform = MeshComp->GetSocketTransform("spine_02", RTS_World);
 
-    // 3. ½« HitLocation ×ª»»µ½¹Ç÷À¾Ö²¿¿Õ¼ä
+    // 3. å°† HitLocation è½¬æ¢åˆ°éª¨éª¼å±€éƒ¨ç©ºé—´
     FVector LocalPos = UKismetMathLibrary::InverseTransformLocation(SpineTransform, HitLocation);
 
-    // 4. È¡ Z ×ø±ê£¨ÉÏÏÂ·½Ïò£©
+    // 4. å– Z åæ ‡ï¼ˆä¸Šä¸‹æ–¹å‘ï¼‰
     double LocalZ = LocalPos.Z;
 
-    // 5. Óë SplitArea ±È½Ï
+    // 5. ä¸ SplitArea æ¯”è¾ƒ
     if (LocalZ < -ZombieData->HitReactionBase.SplitArea)
     {
-        E_ChestStrikePosition = EChestStrikePosition::Spine_Left;   // ¶ÔÓ¦ NewEnumerator0
+        E_ChestStrikePosition = EChestStrikePosition::Spine_Left;   // å¯¹åº” NewEnumerator0
     }
     else if (LocalZ > ZombieData->HitReactionBase.SplitArea)
     {
-        E_ChestStrikePosition = EChestStrikePosition::Spine_Right;  // ¶ÔÓ¦ NewEnumerator3
+        E_ChestStrikePosition = EChestStrikePosition::Spine_Right;  // å¯¹åº” NewEnumerator3
     }
     else
     {
-        E_ChestStrikePosition = EChestStrikePosition::Spine_Middle; // ¶ÔÓ¦ NewEnumerator4
+        E_ChestStrikePosition = EChestStrikePosition::Spine_Middle; // å¯¹åº” NewEnumerator4
     }
 
 
@@ -282,7 +462,7 @@ USkeletalMeshComponent* AZombieBase::FindMeshByTag(FName Tag)
 
 void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
 {
-    // ËÀÍöºó´¦Àí
+    // æ­»äº¡åå¤„ç†
     if (bIsDeath)
     {
         UGoreComponent* GoreComp = FindComponentByClass<UGoreComponent>();
@@ -292,7 +472,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
             GoreComp->SpawnBloodPoolFromBleedingHits(0.6f, 0.9f, HitLocation, SpawnRot, 500.0f, FVector2D(0.5f, 2.0f));
             GoreComp->SpawnPenetratingBloodPool(false, HitLocation, ShotFromDirection, FVector2D(0.5f, 1.5f), 200.0f, 1.0f);
         }
-        // ËÀÍöºóÊÇ·ñ»¹ÄÜ¶ÏÖ«ÓÉ bDismemberOnDeath ºÍ DismemberPower ¿ØÖÆ
+        // æ­»äº¡åæ˜¯å¦è¿˜èƒ½æ–­è‚¢ç”± bDismemberOnDeath å’Œ DismemberPower æ§åˆ¶
         if (!ZombieData->DismemberConfig.bDismemberOnDeath || DismemberPower <= 1) return;
     }
 
@@ -300,13 +480,14 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
     bool bIsHead = (Bone == ZombieData->BoneNames.HeadBoneName);
     bool bShouldDismember = false;
 
-     // ¿Û¼õ¼ÆÊıÆ÷
+     // æ‰£å‡è®¡æ•°å™¨
     if (bIsHead)
     {
         HeadBreakBullets = FMath::Max(HeadBreakBullets - DismemberPower, 0);
         if (bCanDismember && HeadBreakBullets <= 0)
         {
             bShouldDismember = true;
+            HasBreakHead = true;
             SpawnHeadFragment();
         }
     }
@@ -331,10 +512,10 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
         }
     }
 
-    // ---- Ö´ĞĞ¶ÏÖ«»ò±©»÷/Ñª³Ø ----
+    // ---- æ‰§è¡Œæ–­è‚¢æˆ–æš´å‡»/è¡€æ±  ----
     if (bShouldDismember)
     {
-        // ³É¹¦´¥·¢¶ÏÖ«
+        // æˆåŠŸè§¦å‘æ–­è‚¢
         float ImpulseMag = bIsHead ? FMath::FRandRange(500.0f, 1000.0f) : 0.0f;
         FVector Impulse = ShotFromDirection * ImpulseMag;
 
@@ -343,19 +524,19 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
             GoreComp->DismemberLimb(Bone, Impulse);
         }
 
-        // Ö»ÓĞÍ·²¿»òÍÈ²¿¶ÏÖ«²ÅÁ¢¼´ËÀÍö£»ÊÖ±Û¶ÏÖ«²»ËÀÍö
+        // åªæœ‰å¤´éƒ¨æˆ–è…¿éƒ¨æ–­è‚¢æ‰ç«‹å³æ­»äº¡ï¼›æ‰‹è‡‚æ–­è‚¢ä¸æ­»äº¡
         if (bIsHead || ZombieData->BoneNames.HitFullRightFootNameArr.Contains(Bone) || ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(Bone))
         {
             HandleDeathFunc(ShotFromDirection);
         }
-        // ÊÖ±Û¶ÏÖ«ºó²»µ÷ÓÃËÀÍö£¬É¥Ê¬ÈÔ´æ»î£¨¿É¼ÌĞøÕ½¶·£¬ºóĞø¿ÉÌæ»»ÎŞ±Û¶¯»­£©
+        // æ‰‹è‡‚æ–­è‚¢åä¸è°ƒç”¨æ­»äº¡ï¼Œä¸§å°¸ä»å­˜æ´»ï¼ˆå¯ç»§ç»­æˆ˜æ–—ï¼Œåç»­å¯æ›¿æ¢æ— è‡‚åŠ¨ç”»ï¼‰
     }
     else
     {
-        // Î´´ïµ½¶ÏÖ«Ìõ¼ş£¬¼ì²é±©»÷
+        // æœªè¾¾åˆ°æ–­è‚¢æ¡ä»¶ï¼Œæ£€æŸ¥æš´å‡»
         if (CritSuccess())
         {
-            // ±©»÷ÎŞÊÓ¸½¼şÏŞÖÆ£¬Ö±½ÓÖ«½â
+            // æš´å‡»æ— è§†é™„ä»¶é™åˆ¶ï¼Œç›´æ¥è‚¢è§£
             float ImpulseMag = bIsHead ? FMath::FRandRange(500.0f, 1000.0f) : 0.0f;
             FVector Impulse = ShotFromDirection * ImpulseMag;
 
@@ -364,7 +545,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
                 GoreComp->DismemberLimb(Bone, Impulse);
             }
 
-            // ±©»÷Í¬ÑùÖ»ÓĞÍ·/ÍÈÖÂËÀ
+            // æš´å‡»åŒæ ·åªæœ‰å¤´/è…¿è‡´æ­»
             if (bIsHead || ZombieData->BoneNames.HitFullRightFootNameArr.Contains(Bone) || ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(Bone))
             {
                 HandleDeathFunc(ShotFromDirection);
@@ -372,7 +553,7 @@ void AZombieBase::DismemberLimb(int32 DismemberPower, bool bCanDismember)
         }
         else
         {
-            // ·Ç¶ÏÖ«·Ç±©»÷£ºÉú³ÉÑª³Ø
+            // éæ–­è‚¢éæš´å‡»ï¼šç”Ÿæˆè¡€æ± 
             if (UGoreComponent* GoreComp = FindComponentByClass<UGoreComponent>())
             {
                 FRotator SpawnRot = HitNormal.Rotation();
@@ -388,22 +569,22 @@ void AZombieBase::SpawnHeadFragment_Implementation()
 {
     if (!ZombieData->DismemberConfig.HeadFragmentClass) return;
 
-    // 1. »ñÈ¡¹Ç÷ÀÍø¸ñ×é¼ş
+    // 1. è·å–éª¨éª¼ç½‘æ ¼ç»„ä»¶
     USkeletalMeshComponent* TargetMesh = FindMeshByTag("DismemberMesh");
     if (!TargetMesh) return;
 
-    // 2. »ñÈ¡ head ¹Ç÷ÀµÄÊÀ½ç±ä»»
+    // 2. è·å– head éª¨éª¼çš„ä¸–ç•Œå˜æ¢
     FTransform HeadTransform = TargetMesh->GetBoneTransform(FName("head"), ERelativeTransformSpace::RTS_World);
-    FVector SpawnLocation = HeadTransform.GetLocation() + FVector(0, 0, 10); // ZÖáÌ§¸ß 10
+    FVector SpawnLocation = HeadTransform.GetLocation() + FVector(0, 0, 10); // Zè½´æŠ¬é«˜ 10
     FRotator SpawnRotation = HeadTransform.GetRotation().Rotator();
 
-    // 3. ÉèÖÃËõ·Å (0.4, 0.4, 0.4)
+    // 3. è®¾ç½®ç¼©æ”¾ (0.4, 0.4, 0.4)
     FVector SpawnScale = FVector(0.4f);
 
-    // 4. Éú³ÉÍ·ËéÆ¬ Actor
+    // 4. ç”Ÿæˆå¤´ç¢ç‰‡ Actor
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    // Èç¹ûÄãÏ£Íû½«Éú³ÉµÄÍ·ËéÆ¬¹éÊôµ½µ±Ç°½ÇÉ«£¬¿ÉÒÔÉèÖÃ Owner = this;
+    // å¦‚æœä½ å¸Œæœ›å°†ç”Ÿæˆçš„å¤´ç¢ç‰‡å½’å±åˆ°å½“å‰è§’è‰²ï¼Œå¯ä»¥è®¾ç½® Owner = this;
 
     AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
         ZombieData->DismemberConfig.HeadFragmentClass,
@@ -415,7 +596,7 @@ void AZombieBase::SpawnHeadFragment_Implementation()
     if (!SpawnedActor) return;
     SpawnedActor->SetActorScale3D(SpawnScale);
 
-    // Èç¹û¸Ã Actor ÓĞ EnableImpluse º¯Êı£¬Í¨¹ı·´Éäµ÷ÓÃ
+    // å¦‚æœè¯¥ Actor æœ‰ EnableImpluse å‡½æ•°ï¼Œé€šè¿‡åå°„è°ƒç”¨
     UFunction* Func = SpawnedActor->FindFunction(FName("EnableImpluse"));
     if (Func)
     {
@@ -430,12 +611,12 @@ void AZombieBase::SpawnHeadFragment_Implementation()
 
 float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const& PointDamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-    // »ñÈ¡µãÉËº¦ÏêÏ¸ĞÅÏ¢
+    // è·å–ç‚¹ä¼¤å®³è¯¦ç»†ä¿¡æ¯
     const FHitResult& Hit = PointDamageEvent.HitInfo;
     HitLocation = Hit.ImpactPoint;
     HitNormal = Hit.ImpactNormal;
     HitBoneName = Hit.BoneName;
-    ShotFromDirection = PointDamageEvent.ShotDirection;  // Éä»÷·½Ïò
+    ShotFromDirection = PointDamageEvent.ShotDirection;  // å°„å‡»æ–¹å‘
     
     int32 WeaponDismemberPower = 0;
     bool bCanDismember = false;
@@ -447,14 +628,14 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
     }
 
 
-    // »ñÈ¡ÎäÆ÷µÄ¶ÏÖ«È¨ÏŞ
+    // è·å–æ­¦å™¨çš„æ–­è‚¢æƒé™
     bool bAllowDismember = false;
     if (AWeaponBase* Weapon = Cast<AWeaponBase>(DamageCauser))
     {
         bAllowDismember = Weapon->bCanDismember;
     }
 
-    // µ÷ÓÃ¶ÏÖ«Âß¼­
+    // è°ƒç”¨æ–­è‚¢é€»è¾‘
     DismemberLimb(WeaponDismemberPower, bCanDismember);
 
     if (bIsDeath)
@@ -471,14 +652,14 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
         return 0.0f;
     }
 
-    //========== ÑªÁ¿´¦Àí£¨ÆÕÍ¨ÎäÆ÷ÎŞ·¨¶ÏÖ«£¬Ö»ÄÜ¿¿ÉËº¦ÖÂËÀ£© ==========
+    //========== è¡€é‡å¤„ç†ï¼ˆæ™®é€šæ­¦å™¨æ— æ³•æ–­è‚¢ï¼Œåªèƒ½é ä¼¤å®³è‡´æ­»ï¼‰ ==========
     CurrentHealth -= Damage;
 
-    // ´òÓ¡µ±Ç°ÑªÁ¿
+    // æ‰“å°å½“å‰è¡€é‡
     if (GEngine && bDebugShowHealth)
     {
         FString Msg = FString::Printf(TEXT("Health: %.1f / %.1f"), CurrentHealth, ZombieData->CombatConfig.MaxHealth);
-        GEngine->AddOnScreenDebugMessage(1, 3.0f, FColor::Cyan, Msg);   // Key=1 ±£Ö¤Í¬Ò»ÌõÏûÏ¢¸²¸ÇË¢ĞÂ
+        GEngine->AddOnScreenDebugMessage(1, 3.0f, FColor::Cyan, Msg);   // Key=1 ä¿è¯åŒä¸€æ¡æ¶ˆæ¯è¦†ç›–åˆ·æ–°
     }
 
     if (CurrentHealth <= 0.0f)
@@ -508,7 +689,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
 
     SpawnBloodDecal();
 
-    // ---- ²¥·ÅÊÜ»÷ÃÉÌ«Ææ ----
+    // ---- æ’­æ”¾å—å‡»è’™å¤ªå¥‡ ----
     if (CurrentHitReactionMontage)
     {
         UAnimInstance* AnimInst = GetMesh()->GetAnimInstance();
@@ -516,7 +697,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
         {
             AnimInst->StopAllMontages(ZombieData->HitReactionBase.MontageBlendOutTime);
 
-            // ²¥·ÅÃÉÌ«Ææ£¨PlayRate = 1.0, StartingPosition = 0.0£©
+            // æ’­æ”¾è’™å¤ªå¥‡ï¼ˆPlayRate = 1.0, StartingPosition = 0.0ï¼‰
             AnimInst->Montage_Play(CurrentHitReactionMontage, 1.0f, EMontagePlayReturnType::MontageLength, 0.0f, true);
             FOnMontageBlendingOutStarted BlendOutDelegate;
             BlendOutDelegate.BindUObject(this, &AZombieBase::OnRetreatBlendOut);
@@ -527,7 +708,7 @@ float AZombieBase::InternalTakePointDamage(float Damage, FPointDamageEvent const
         ChangeSpeed(ZombieData->MovementConfig.HitStateSpeed);
     }
 
-    // µ÷ÓÃ¸¸ÀàÒÔ±£³ÖÒıÇæÄ¬ÈÏ´¦Àí£¨ÈçÓ¦ÓÃÉËº¦£©
+    // è°ƒç”¨çˆ¶ç±»ä»¥ä¿æŒå¼•æ“é»˜è®¤å¤„ç†ï¼ˆå¦‚åº”ç”¨ä¼¤å®³ï¼‰
     return Super::InternalTakePointDamage(Damage, PointDamageEvent, EventInstigator, DamageCauser);
 }
 
@@ -537,12 +718,12 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
     OutIsHitHead = false;
     FName Bone = HitBoneName;
 
-    // ---- ÅĞ¶ÏÃüÖĞ²¿Î» ----
+    // ---- åˆ¤æ–­å‘½ä¸­éƒ¨ä½ ----
     bool bIsChest = AllChestName.Contains(Bone);
     bool bIsLimbs = AllLimbsName.Contains(Bone);
     bool bIsHead = (Bone == ZombieData->BoneNames.HeadBoneName);
 
-    // ---- Í·²¿ ----
+    // ---- å¤´éƒ¨ ----
 
     if (bIsHead)
     {
@@ -551,7 +732,7 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
         return;
     }
     
-    // ---- ËÄÖ« ----
+    // ---- å››è‚¢ ----
     if (bIsLimbs)
     {
         const TArray<UAnimMontage*>* RightHandArr = nullptr;
@@ -597,7 +778,7 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
         return;
     }
 
-    // ---- ĞØ²¿ ----
+    // ---- èƒ¸éƒ¨ ----
     if (bIsChest)
     {
         OutIsHitHead = false;
@@ -665,7 +846,7 @@ void AZombieBase::MontageCollectionByHitPart(bool& OutIsValid, bool& OutIsHitHea
         return;
     }
 
-    // ---- ¼È²»ÊÇĞØ²¿Ò²²»ÊÇËÄÖ« ----
+    // ---- æ—¢ä¸æ˜¯èƒ¸éƒ¨ä¹Ÿä¸æ˜¯å››è‚¢ ----
     OutIsValid = false;
     OutIsHitHead = false;
     return;
@@ -676,7 +857,7 @@ void AZombieBase::FindDirectionHitHeadReaction(bool& OutIsValid)
     OutIsValid = false;
     CurrentHitReactionMontage = nullptr;
 
-    // ¸ù¾İÃüÖĞ·½ÏòÑ¡Ôñ¶ÔÓ¦µÄÃÉÌ«ÆæÊı×é
+    // æ ¹æ®å‘½ä¸­æ–¹å‘é€‰æ‹©å¯¹åº”çš„è’™å¤ªå¥‡æ•°ç»„
     TArray<UAnimMontage*>* SelectedArray = nullptr;
 
     switch (HitDirection)
@@ -697,29 +878,29 @@ void AZombieBase::FindDirectionHitHeadReaction(bool& OutIsValid)
         SelectedArray = &ZombieData->HitMontages.HitHeadMontage_Back;
         break;
 
-    default:  // None »òÆäËûÎ´¶¨ÒåÖµ
+    default:  // None æˆ–å…¶ä»–æœªå®šä¹‰å€¼
         OutIsValid = false;
         return;
     }
 
-    // ¼ì²éÊı×éÊÇ·ñÎª¿Õ
+    // æ£€æŸ¥æ•°ç»„æ˜¯å¦ä¸ºç©º
     if (!SelectedArray || SelectedArray->IsEmpty())
     {
         OutIsValid = false;
         return;
     }
 
-    // ´ÓÊı×éÖĞËæ»úÑ¡ÔñÒ»¸öÃÉÌ«Ææ
+    // ä»æ•°ç»„ä¸­éšæœºé€‰æ‹©ä¸€ä¸ªè’™å¤ªå¥‡
     int32 RandomIndex = FMath::RandRange(0, SelectedArray->Num() - 1);
     CurrentHitReactionMontage = (*SelectedArray)[RandomIndex];
 
-    // Èç¹ûÑ¡ÖĞµÄÃÉÌ«ÆæÓĞĞ§£¬Ôò·µ»Ø true
+    // å¦‚æœé€‰ä¸­çš„è’™å¤ªå¥‡æœ‰æ•ˆï¼Œåˆ™è¿”å› true
     OutIsValid = (CurrentHitReactionMontage != nullptr);
 }
 
 bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand, const TArray<UAnimMontage*>& MT_LeftHand, const TArray<UAnimMontage*>& MT_RightFoot, const TArray<UAnimMontage*>& MT_LeftFoot)
 {
-    // ÓÒÊÖ
+    // å³æ‰‹
     if (ZombieData->BoneNames.HitFullRightHandNameArr.Contains(HitBoneName))
     {
         if (!MT_RightHand.IsEmpty())
@@ -730,7 +911,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         }
         return false;
     }
-    // ×óÊÖ
+    // å·¦æ‰‹
     if (ZombieData->BoneNames.HitFullLeftHandNameArr.Contains(HitBoneName))
     {
         if (!MT_LeftHand.IsEmpty())
@@ -741,7 +922,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         }
         return false;
     }
-    // ÓÒ½Å
+    // å³è„š
     if (ZombieData->BoneNames.HitFullRightFootNameArr.Contains(HitBoneName))
     {
         if (!MT_RightFoot.IsEmpty())
@@ -752,7 +933,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
         }
         return false;
     }
-    // ×ó½Å
+    // å·¦è„š
     if (ZombieData->BoneNames.HitFullLeftFootNameArr.Contains(HitBoneName))
     {
         if (!MT_LeftFoot.IsEmpty())
@@ -769,7 +950,7 @@ bool AZombieBase::FindHitLimbsMontage(const TArray<UAnimMontage*>& MT_RightHand,
 
 bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMontage, const TArray<UAnimMontage*>& MidChestMontage, const TArray<UAnimMontage*>& LowerChestMontage)
 {
-    // ¼ì²éÊÇ·ñÊôÓÚÉÏĞØ²¿¹Ç÷À×é
+    // æ£€æŸ¥æ˜¯å¦å±äºä¸Šèƒ¸éƒ¨éª¨éª¼ç»„
     if (ZombieData->BoneNames.HitUpperChestNameArr.Contains(HitBoneName))
     {
         if (!UpperChestMontage.IsEmpty())
@@ -780,7 +961,7 @@ bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMon
         }
         return false;
     }
-    // ¼ì²éÊÇ·ñÊôÓÚÖĞĞØ²¿¹Ç÷À×é
+    // æ£€æŸ¥æ˜¯å¦å±äºä¸­èƒ¸éƒ¨éª¨éª¼ç»„
     if (ZombieData->BoneNames.HitMidChestNameArr.Contains(HitBoneName))
     {
         if (!MidChestMontage.IsEmpty())
@@ -791,7 +972,7 @@ bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMon
         }
         return false;
     }
-    // ¼ì²éÊÇ·ñÊôÓÚÏÂĞØ²¿¹Ç÷À×é
+    // æ£€æŸ¥æ˜¯å¦å±äºä¸‹èƒ¸éƒ¨éª¨éª¼ç»„
     if (ZombieData->BoneNames.HitLowerChestNameArr.Contains(HitBoneName))
     {
         if (!LowerChestMontage.IsEmpty())
@@ -802,22 +983,22 @@ bool AZombieBase::FindHitChestMontage(const TArray<UAnimMontage*>& UpperChestMon
         }
         return false;
     }
-    // ¶¼²»ÊôÓÚ
+    // éƒ½ä¸å±äº
     return false;
 }
 
 void AZombieBase::CountBoneHitsAndGetDizzey(int32 Plus)
 {
-    // ÀÛ¼ÓÃüÖĞ¼ÆÊı
+    // ç´¯åŠ å‘½ä¸­è®¡æ•°
     HitCountIntoDizzey += Plus;
 
-    // ÅĞ¶ÏÊÇ·ñ´ïµ½Ñ£ÔÎãĞÖµ
+    // åˆ¤æ–­æ˜¯å¦è¾¾åˆ°çœ©æ™•é˜ˆå€¼
     if (HitCountIntoDizzey >= ZombieData->HitReactionBase.IntoHeadDizzeyCount)
     {
-        // ÉèÖÃÑ£ÔÎÃÉÌ«Ææ
+        // è®¾ç½®çœ©æ™•è’™å¤ªå¥‡
         CurrentHitReactionMontage = ZombieData->HitReactionBase.HitInStunned;
 
-        // ÖØÖÃ¼ÆÊı
+        // é‡ç½®è®¡æ•°
         HitCountIntoDizzey = 0;
     }
 }
@@ -838,7 +1019,7 @@ void AZombieBase::StartChase()
 
     bChasePlayer = true;
 
-    // È·±£ÓµÓĞ AI ¿ØÖÆÆ÷
+    // ç¡®ä¿æ‹¥æœ‰ AI æ§åˆ¶å™¨
     AAIController* AIC = Cast<AAIController>(GetController());
     if (!AIC)
     {
@@ -848,7 +1029,7 @@ void AZombieBase::StartChase()
 
     ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
 
-    // Æô¶¯¶¨Ê±Ñ­»·
+    // å¯åŠ¨å®šæ—¶å¾ªç¯
     GetWorldTimerManager().SetTimer(ChaseTimerHandle, this, &AZombieBase::ChaseTick, ZombieData->ChaseConfig.ChaseUpdateInterval, true);
 }
 
@@ -866,7 +1047,7 @@ void AZombieBase::StopChase()
 }
 
 void AZombieBase::ChaseTick()
-{ // ËÀÍöÔòÍ£Ö¹×·»÷
+{ // æ­»äº¡åˆ™åœæ­¢è¿½å‡»
 
 
     if (bIsDeath)
@@ -875,17 +1056,17 @@ void AZombieBase::ChaseTick()
         return;
     }
 
-    // »ñÈ¡Íæ¼Ò Pawn
+    // è·å–ç©å®¶ Pawn
     APawn* PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
     if (!PlayerPawn) return;
 
-    // »ñÈ¡ AI ¿ØÖÆÆ÷
+    // è·å– AI æ§åˆ¶å™¨
     AAIController* AIC = Cast<AAIController>(GetController());
     if (!AIC) return;
 
     if (bIsSprintAttacking || bIsAttacking || InHitState) return;
 
-    // ¼ÆËã¾àÀë
+    // è®¡ç®—è·ç¦»
     float Dist = FVector::Distance(GetActorLocation(), PlayerPawn->GetActorLocation());
 
 
@@ -894,7 +1075,7 @@ void AZombieBase::ChaseTick()
         ChangeSpeed(ZombieData->MovementConfig.HitStateSpeed);
     }
 
-    // ---- ³å´Ì¹¥»÷ÅĞ¶¨ ----
+    // ---- å†²åˆºæ”»å‡»åˆ¤å®š ----
     float CurrentTime = GetWorld()->GetTimeSeconds();
     if (Dist >= ZombieData->SprintAttackConfig.SprintMinRange && Dist <= ZombieData->SprintAttackConfig.SprintMaxRange &&
         ZombieData->SprintAttackConfig.SprintAttackMontages.Num() > 0 &&
@@ -902,7 +1083,7 @@ void AZombieBase::ChaseTick()
         (CurrentTime - LastRetreatTime >= ZombieData->AvoidanceConfig.RetreatCooldown) && !InHitState && ZombieData->SprintAttackConfig.bEnableSprintAttack)
     {
         bIsSprintAttacking = true;
-        ChangeSpeed(ZombieData->MovementConfig.SprintSpeed);   // ³å´ÌËÙ¶È
+        ChangeSpeed(ZombieData->MovementConfig.SprintSpeed);   // å†²åˆºé€Ÿåº¦
         LastSprintTime = CurrentTime;
 
         int32 RandomIndex = FMath::RandRange(0, ZombieData->SprintAttackConfig.SprintAttackMontages.Num() - 1);
@@ -920,31 +1101,31 @@ void AZombieBase::ChaseTick()
 
             }
         }
-        return;  // Ìø¹ı±¾´Î Tick£¬±ÜÃâÍ¬Ê±½øÈëÆÕÍ¨¹¥»÷
+        return;  // è·³è¿‡æœ¬æ¬¡ Tickï¼Œé¿å…åŒæ—¶è¿›å…¥æ™®é€šæ”»å‡»
     }
     
 
-    //ÆÕÍ¨¹¥»÷
+    //æ™®é€šæ”»å‡»
     if (Dist <= ZombieData->AttackConfig.AttackRange && !bIsSprintAttacking &&  CurrentTime - LastRetreatTime >= ZombieData->AvoidanceConfig.RetreatCooldown && !InHitState)
     {
 
         const bool bCanLeft = (LeftArmBreakBullets > 0);
         const bool bCanRight = (RightArmBreakBullets > 0);
 
-        // Èç¹ûÁ½Ö»ÊÖ±Û¶¼¶ÏÁË£¬²»·¢¶¯¹¥»÷
+        // å¦‚æœä¸¤åªæ‰‹è‡‚éƒ½æ–­äº†ï¼Œä¸å‘åŠ¨æ”»å‡»
         if (!bCanLeft && !bCanRight)
         {
             return;
         }
 
-        // ¾ö¶¨ÓÃÄÄÖ»ÊÖ
+        // å†³å®šç”¨å“ªåªæ‰‹
         const bool bUseLeft = (bCanLeft && bCanRight) ? FMath::RandBool() : bCanLeft;
 
         const TArray<UAnimMontage*>& AttackMontages = bUseLeft
             ? ZombieData->AttackConfig.LeftAttackMontages
             : ZombieData->AttackConfig.RightAttackMontages;
 
-        // ½øÈë¹¥»÷·¶Î§£¬³¢ÊÔ¹¥»÷
+        // è¿›å…¥æ”»å‡»èŒƒå›´ï¼Œå°è¯•æ”»å‡»
         if (AttackMontages.Num() > 0)
         {
            
@@ -968,7 +1149,7 @@ void AZombieBase::ChaseTick()
                 }
             }
         }
-        return; // ÒÑÔÚ·¶Î§ÄÚ£¬²»ÒÆ¶¯
+        return; // å·²åœ¨èŒƒå›´å†…ï¼Œä¸ç§»åŠ¨
     }
 
     if (Dist > ZombieData->ChaseConfig.ChaseAcceptanceRadius)
@@ -980,8 +1161,6 @@ void AZombieBase::ChaseTick()
         GetCharacterMovement()->bUseControllerDesiredRotation = false;
         AIC->MoveToActor(PlayerPawn, ZombieData->ChaseConfig.ChaseAcceptanceRadius, false, true, true);
     }
-
-
 }
 
 void AZombieBase::EnableAttackCollisionDetection_Implementation()
@@ -992,7 +1171,7 @@ void AZombieBase::EnableAttackCollisionDetection_Implementation()
 void AZombieBase::OnAnyMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
     if (!Montage) return;
-    // ¹¥»÷ÃÉÌ«Ææ½áÊø
+    // æ”»å‡»è’™å¤ªå¥‡ç»“æŸ
     if (bIsAttacking && ZombieData->AttackConfig.AttackMontages.Contains(Montage))
     {
         bIsAttacking = false;
@@ -1000,19 +1179,19 @@ void AZombieBase::OnAnyMontageEnded(UAnimMontage* Montage, bool bInterrupted)
         PlayRetreatToMakeSpace();
 
     }
-    // ³å´Ì¹¥»÷ÃÉÌ«Ææ½áÊø
+    // å†²åˆºæ”»å‡»è’™å¤ªå¥‡ç»“æŸ
     else if (bIsSprintAttacking && ZombieData->SprintAttackConfig.SprintAttackMontages.Contains(Montage))
     {
         bIsSprintAttacking = false;
         ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);
         PlayRetreatToMakeSpace();
     }
-    // ÊÜ»÷ÃÉÌ«Ææ½áÊø£¨Èç¹ûÄãÒ²ÏëÓÃÕâ¸öÍ³Ò»»Øµ÷£©
+    // å—å‡»è’™å¤ªå¥‡ç»“æŸï¼ˆå¦‚æœä½ ä¹Ÿæƒ³ç”¨è¿™ä¸ªç»Ÿä¸€å›è°ƒï¼‰
     else if (InHitState && CurrentHitReactionMontage == Montage)
     {
        
         InHitState = false;
-        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);  // »ò RunSpeed£¬¸ù¾İÄãµÄÉè¼Æ
+        ChangeSpeed(ZombieData->MovementConfig.WalkSpeed);  // æˆ– RunSpeedï¼Œæ ¹æ®ä½ çš„è®¾è®¡
     }
    
     GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -1024,7 +1203,7 @@ void AZombieBase::PerformAttackDamage()
 {
     if (bIsDeath) return;
 
-    // ¶Ô×óÓÒÊÖ¸÷¼ì²âÒ»´Î
+    // å¯¹å·¦å³æ‰‹å„æ£€æµ‹ä¸€æ¬¡
     CheckAttackHit(ZombieData->AttackConfig.AttackSocketLeft);
     CheckAttackHit(ZombieData->AttackConfig.AttackSocketRight);
 }
@@ -1037,11 +1216,11 @@ void AZombieBase::CheckAttackHit(FName SocketName)
     FVector Start = TargetMesh->GetSocketLocation(SocketName);
     FVector End = Start;
 
-    // ºöÂÔ×ÔÉí¼°ËùÓĞÉ¥Ê¬Í¬Àà
+    // å¿½ç•¥è‡ªèº«åŠæ‰€æœ‰ä¸§å°¸åŒç±»
     TArray<AActor*> IgnoredActors;
-    IgnoredActors.Add(this);   // ºöÂÔ×ÔÉí
+    IgnoredActors.Add(this);   // å¿½ç•¥è‡ªèº«
 
-    // ½«³¡¾°ÖĞËùÓĞÉ¥Ê¬¼ÓÈëºöÂÔÁĞ±í£¨¼òµ¥µ«ÓĞµã±©Á¦£¬Ò²¿É¸ÄÓÃÅö×²Í¨µÀ£© //×ÔĞĞĞŞ¸Ä£¡£¡£¡
+    // å°†åœºæ™¯ä¸­æ‰€æœ‰ä¸§å°¸åŠ å…¥å¿½ç•¥åˆ—è¡¨ï¼ˆç®€å•ä½†æœ‰ç‚¹æš´åŠ›ï¼Œä¹Ÿå¯æ”¹ç”¨ç¢°æ’é€šé“ï¼‰ //è‡ªè¡Œä¿®æ”¹ï¼ï¼ï¼
     for (TActorIterator<AZombieBase> It(GetWorld()); It; ++It)
     {
         if (*It != this)
@@ -1057,14 +1236,14 @@ void AZombieBase::CheckAttackHit(FName SocketName)
         ETraceTypeQuery::TraceTypeQuery1,
         false,
         IgnoredActors,
-        EDrawDebugTrace::None,   // µ÷ÊÔÊ±¿ÉÁÙÊ±¸ÄÎª ForOneFrame
+        EDrawDebugTrace::None,   // è°ƒè¯•æ—¶å¯ä¸´æ—¶æ”¹ä¸º ForOneFrame
         Hit,
         true
     );
 
     if (bHit && Hit.GetActor())
     {
-        // Ë«ÖØ±£ÏÕ£ºÈ·±£²»ÊÇÉ¥Ê¬£¨ÍòÒ»Â©Íø£©
+        // åŒé‡ä¿é™©ï¼šç¡®ä¿ä¸æ˜¯ä¸§å°¸ï¼ˆä¸‡ä¸€æ¼ç½‘ï¼‰
         if (Hit.GetActor()->IsA(AZombieBase::StaticClass())) return;
 
         APawn* HitPawn = Cast<APawn>(Hit.GetActor());
@@ -1087,11 +1266,11 @@ void AZombieBase::CheckAttackHit(FName SocketName)
 
 bool AZombieBase::CritSuccess() const
 {
-    // ¼ÆËã¸ÅÂÊ£ºCritChance / 100.0
+    // è®¡ç®—æ¦‚ç‡ï¼šCritChance / 100.0
     double Probability = ZombieData->CombatConfig.CritChance / 100.0;
-    // Éú³É 0~1 Ëæ»ú¸¡µãÊı
+    // ç”Ÿæˆ 0~1 éšæœºæµ®ç‚¹æ•°
     double RandomValue = FMath::FRand();
-    // Èç¹û¸ÅÂÊ´óÓÚËæ»úÊı£¬Ôò±©»÷³É¹¦£¨×¢ÒâÀ¶Í¼ÓÃ Greater£¬¼´ Probability > RandomValue£©
+    // å¦‚æœæ¦‚ç‡å¤§äºéšæœºæ•°ï¼Œåˆ™æš´å‡»æˆåŠŸï¼ˆæ³¨æ„è“å›¾ç”¨ Greaterï¼Œå³ Probability > RandomValueï¼‰
     return Probability > RandomValue;
 }
 
@@ -1102,51 +1281,51 @@ void AZombieBase::HandleDeathFunc(FVector InShotFromDirection)
     USkeletalMeshComponent* TargetMesh = FindMeshByTag("DismemberMesh");
     if (!TargetMesh) return;
 
-    // 2. ÆôÓÃÎïÀíÄ£Äâ
+    // 2. å¯ç”¨ç‰©ç†æ¨¡æ‹Ÿ
     TargetMesh->SetSimulatePhysics(true);
 
-    // 3. Ê©¼Ó³åÁ¿£¨Ê¹ÓÃ InShotFromDirection ³ËÒÔ 20000£©
+    // 3. æ–½åŠ å†²é‡ï¼ˆä½¿ç”¨ InShotFromDirection ä¹˜ä»¥ 20000ï¼‰
     FVector Impulse = InShotFromDirection * 20000.0f;
     TargetMesh->AddImpulse(Impulse, NAME_None, false); // bVelChange = false
 
-    // 4. ÉèÖÃ¹Ç÷ÀÍø¸ñÅö×²Îª QueryAndPhysics
+    // 4. è®¾ç½®éª¨éª¼ç½‘æ ¼ç¢°æ’ä¸º QueryAndPhysics
     TargetMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     TargetMesh->SetCollisionResponseToAllChannels(ECR_Block);
     TargetMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-    GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore); //²»ÖªµÀÉ¶BUG
-    // 5. ÉèÖÃ½ºÄÒÌåÅö×²Îª NoCollision
+    GetMesh()->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore); //ä¸çŸ¥é“å•¥BUG
+    // 5. è®¾ç½®èƒ¶å›Šä½“ç¢°æ’ä¸º NoCollision
     UCapsuleComponent* CapsuleComp = GetCapsuleComponent();
     if (CapsuleComp)
     {
         CapsuleComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     }
 
-    // 6. Í£Ö¹¶¯»­²¢ÉèÖÃÎªµ¥½ÚµãÄ£Ê½
+    // 6. åœæ­¢åŠ¨ç”»å¹¶è®¾ç½®ä¸ºå•èŠ‚ç‚¹æ¨¡å¼
     TargetMesh->Stop();
     GetMesh()->Stop();
 
     TargetMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-    // Ç¿ÖÆ³õÊ¼»¯¶¯»­ÊµÀı£¨µÈÍ¬ÓÚÀ¶Í¼ÖĞµÄ bForceInitAnimScriptInstance = true£©
-    // ×¢Òâ£ºSetAnimationMode ÓĞÒ»¸öÖØÔØ°æ±¾¿É½ÓÊÜ bForceInit£¬µ«ÎÒÃÇÊÖ¶¯µ÷ÓÃ
-    TargetMesh->InitAnim(true); // Ç¿ÖÆÖØĞÂ³õÊ¼»¯
+    // å¼ºåˆ¶åˆå§‹åŒ–åŠ¨ç”»å®ä¾‹ï¼ˆç­‰åŒäºè“å›¾ä¸­çš„ bForceInitAnimScriptInstance = trueï¼‰
+    // æ³¨æ„ï¼šSetAnimationMode æœ‰ä¸€ä¸ªé‡è½½ç‰ˆæœ¬å¯æ¥å— bForceInitï¼Œä½†æˆ‘ä»¬æ‰‹åŠ¨è°ƒç”¨
+    TargetMesh->InitAnim(true); // å¼ºåˆ¶é‡æ–°åˆå§‹åŒ–
     GetMesh()->Stop();
     GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 
-    // 7. ÉèÖÃ bIsDeath = true£¨Èç¹ûÄúµÄ±äÁ¿½Ğ IsDeath£¬Çë°´Êµ¼ÊÃû³Æ£©
+    // 7. è®¾ç½® bIsDeath = trueï¼ˆå¦‚æœæ‚¨çš„å˜é‡å« IsDeathï¼Œè¯·æŒ‰å®é™…åç§°ï¼‰
     bIsDeath = true;
     StopChase();
-    // 8. ½« Mesh ×é¼ş´Ó¸¸¼¶·ÖÀë£¨±£³ÖÊÀ½ç±ä»»£©
+    // 8. å°† Mesh ç»„ä»¶ä»çˆ¶çº§åˆ†ç¦»ï¼ˆä¿æŒä¸–ç•Œå˜æ¢ï¼‰
     TargetMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
     GetMesh()->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 
-    //9. Í£Ö¹¿ØÖÆÆ÷ÒÆ¶¯£¨ĞŞ¸´Ãû³Æ³åÍ»£©
+    //9. åœæ­¢æ§åˆ¶å™¨ç§»åŠ¨ï¼ˆä¿®å¤åç§°å†²çªï¼‰
     AController* MyController = GetController();
     if (MyController)
     {
         MyController->StopMovement();
     }
 
-    // ¶¨ÒåÏú»Ù×é¼şµÄ Lambda
+    // å®šä¹‰é”€æ¯ç»„ä»¶çš„ Lambda
     auto DestroyComponentByClass = [this](TSubclassOf<UActorComponent> CompClass)
         {
             UActorComponent* Comp = FindComponentByClass(CompClass);
@@ -1157,16 +1336,20 @@ void AZombieBase::HandleDeathFunc(FVector InShotFromDirection)
         };
 
     //10. 
-    DestroyComponentByClass(UCharacterMovementComponent::StaticClass());
-    //ĞèÒª¸ü¸Ä
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+    {
+        MoveComp->StopMovementImmediately();
+        MoveComp->DisableMovement();   // æˆ– SetActive(false)
+    }
+
     
     SetLifeSpan(ZombieData->CombatConfig.CorpseLifeSpan);
 
-    // 11. ½ûÓÃ Actor µÄ Tick
+    // 11. ç¦ç”¨ Actor çš„ Tick
     SetActorTickEnabled(false);
 
     OnDeath.Broadcast(bIsDeath);
-    //ËÀÍöÖ«½âºó»áÏİÈëµØÃæ£¡£¡ĞèÒª¸Ä
+    //æ­»äº¡è‚¢è§£åä¼šé™·å…¥åœ°é¢ï¼ï¼éœ€è¦æ”¹
 
 }
 
@@ -1188,20 +1371,20 @@ FVector AZombieBase::CalculateDirection(AActor* Target) const
 {
     if (!Target) return FVector::ZeroVector;
 
-    // 1. ¼ÆËã´Ó½ÇÉ«Ö¸ÏòÄ¿±êµÄÏòÁ¿
+    // 1. è®¡ç®—ä»è§’è‰²æŒ‡å‘ç›®æ ‡çš„å‘é‡
     const FVector CharLoc = GetActorLocation();
     const FVector TargetLoc = Target->GetActorLocation();
     const FVector ToTarget = TargetLoc - CharLoc;                     // L_Vector_AB
    
-    // 4. ·µ»Ø¹éÒ»»¯ºóµÄ·½Ïò£¨°²È«Æğ¼û´¦ÀíÁãÏòÁ¿£©
-    // 2. ÅĞ¶ÏÄ¿±êÔÚ½ÇÉ«µÄ×ó²à»¹ÊÇÓÒ²à£¨ÀûÓÃÓÒÏòÁ¿µÄµã»ı£©
+    // 4. è¿”å›å½’ä¸€åŒ–åçš„æ–¹å‘ï¼ˆå®‰å…¨èµ·è§å¤„ç†é›¶å‘é‡ï¼‰
+    // 2. åˆ¤æ–­ç›®æ ‡åœ¨è§’è‰²çš„å·¦ä¾§è¿˜æ˜¯å³ä¾§ï¼ˆåˆ©ç”¨å³å‘é‡çš„ç‚¹ç§¯ï¼‰
     const FVector RightVec = GetActorRightVector();
     const float Dot = FVector::DotProduct(ToTarget, RightVec);
     const bool bIsRight = (Dot >= 0.0f);                              // L_IsRight
 
-    // 3. ¸ù¾İ×óÓÒÑ¡Ôñ±Ü¿ª·½Ïò£¨´¹Ö±ÓÚ ToTarget µÄ²àÃæÏòÁ¿£©
-   //    - Ä¿±êÔÚÓÒ²à(bIsRight=true) ¡ú ÄæÊ±ÕëĞı×ª90¶È = (Y, -X)
-   //    - Ä¿±êÔÚ×ó²à(bIsRight=false) ¡ú Ë³Ê±ÕëĞı×ª90¶È = (-Y, X)
+    // 3. æ ¹æ®å·¦å³é€‰æ‹©é¿å¼€æ–¹å‘ï¼ˆå‚ç›´äº ToTarget çš„ä¾§é¢å‘é‡ï¼‰
+   //    - ç›®æ ‡åœ¨å³ä¾§(bIsRight=true) â†’ é€†æ—¶é’ˆæ—‹è½¬90åº¦ = (Y, -X)
+   //    - ç›®æ ‡åœ¨å·¦ä¾§(bIsRight=false) â†’ é¡ºæ—¶é’ˆæ—‹è½¬90åº¦ = (-Y, X)
     FVector AddDirection;
     if (bIsRight)
     {
@@ -1217,7 +1400,7 @@ FVector AZombieBase::CalculateDirection(AActor* Target) const
 
 void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForwardStrength)
 {
-    // ¼ÆËãÉäÏß³¤¶È
+    // è®¡ç®—å°„çº¿é•¿åº¦
     UCapsuleComponent* Capsule = GetCapsuleComponent();
     float CapsuleRadius = Capsule ? Capsule->GetScaledCapsuleRadius() : 34.0f;
     float TraceLength = CapsuleRadius + ZombieData->AvoidanceConfig.TraceCheckDistance;
@@ -1228,7 +1411,7 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
     FVector RotatedForward = Rot.RotateVector(Forward);
     FVector End = Start + RotatedForward * TraceLength;
 
-    // ÉäÏß¼ì²â
+    // å°„çº¿æ£€æµ‹
     FHitResult HitResult;
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(this);
@@ -1241,7 +1424,7 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
         ZombieData->AvoidanceConfig.AvoidanceTraceChannel,
         false,
         TArray<AActor*>(),
-        EDrawDebugTrace::ForOneFrame,   // ¿É¸ÄÎª ForDuration µ÷ÊÔ
+        EDrawDebugTrace::ForOneFrame,   // å¯æ”¹ä¸º ForDuration è°ƒè¯•
         HitResult,
         true
     );
@@ -1250,11 +1433,11 @@ void AZombieBase::TraceCheck(float Rotate,float InElbowPushStrength,float InForw
     {
         AActor* HitActor = HitResult.GetActor();
 
-        // Öâ»÷·½Ïò£ºÖ¸Ïò±»ÃüÖĞÕßµÄË®Æ½ÏòÁ¿
+        // è‚˜å‡»æ–¹å‘ï¼šæŒ‡å‘è¢«å‘½ä¸­è€…çš„æ°´å¹³å‘é‡
         FVector ElbowDir = CalculateDirection(HitActor);
       
 
-        // Ö»¶Ô ZombieBase ´¥·¢±»¶¯ÒÆ¶¯£¨À¶Í¼Ô­Âß¼­Îª»ñÈ¡×é¼şºóµ÷ÓÃ£©
+        // åªå¯¹ ZombieBase è§¦å‘è¢«åŠ¨ç§»åŠ¨ï¼ˆè“å›¾åŸé€»è¾‘ä¸ºè·å–ç»„ä»¶åè°ƒç”¨ï¼‰
         if (AZombieBase* OtherZombie = Cast<AZombieBase>(HitActor))
         {
             FVector ScaledElbow = ElbowDir * InElbowPushStrength;
@@ -1282,24 +1465,24 @@ void AZombieBase::SpeedUp(float InForwardStrength)
 {
     if (!ZombieData->AvoidanceConfig.bEnableSpeedUp) return;
 
-    // »ñÈ¡µ±Ç°ËÙ¶ÈÊ¸Á¿
+    // è·å–å½“å‰é€Ÿåº¦çŸ¢é‡
     FVector Velocity = GetVelocity();
 
-    // ¹éÒ»»¯·½Ïò£¨Èç¹ûËÙ¶ÈÎªÁãÔòÌø¹ı£¬±ÜÃâÁãÏòÁ¿¹éÒ»»¯£©
+    // å½’ä¸€åŒ–æ–¹å‘ï¼ˆå¦‚æœé€Ÿåº¦ä¸ºé›¶åˆ™è·³è¿‡ï¼Œé¿å…é›¶å‘é‡å½’ä¸€åŒ–ï¼‰
     FVector VelocityDir = Velocity.GetSafeNormal();
     if (VelocityDir.IsNearlyZero())
         return;
 
-    // »ñÈ¡µ±Ç°ËÙ¶È±êÁ¿£¨ÀåÃ×/Ãë£©
+    // è·å–å½“å‰é€Ÿåº¦æ ‡é‡ï¼ˆå˜ç±³/ç§’ï¼‰
     float CurrentSpeed = Velocity.Size();
  
-    // ½«ËÙ¶ÈÖµÇ¯ÖÆÔÚ 1.0 ~ 2.0 Ö®¼ä£¬×÷ÎªÎ»ÒÆËõ·ÅÏµÊı
+    // å°†é€Ÿåº¦å€¼é’³åˆ¶åœ¨ 1.0 ~ 2.0 ä¹‹é—´ï¼Œä½œä¸ºä½ç§»ç¼©æ”¾ç³»æ•°
     float SpeedScale = FMath::Clamp(CurrentSpeed, 1.0f, 2.0f);
 
-    // ¼ÆËã±¾Ö¡µÄ¶îÍâÎ»ÒÆ
+    // è®¡ç®—æœ¬å¸§çš„é¢å¤–ä½ç§»
     FVector DeltaLocation = VelocityDir * SpeedScale;
 
-    // Ó¦ÓÃÊÀ½çÆ«ÒÆ£¨²»É¨Ãè£¬²»´«ËÍ£©
+    // åº”ç”¨ä¸–ç•Œåç§»ï¼ˆä¸æ‰«æï¼Œä¸ä¼ é€ï¼‰
     AddActorWorldOffset(DeltaLocation* InForwardStrength, false, nullptr, ETeleportType::None);
 }
 
@@ -1326,7 +1509,7 @@ void AZombieBase::OnRetreatBlendOut(UAnimMontage* Montage, bool bInterrupted)
 {
     if (!bInterrupted)
     {
-        // ¼ÇÂ¼ÀäÈ´Ê±¼ä
+        // è®°å½•å†·å´æ—¶é—´
         LastRetreatTime = GetWorld()->GetTimeSeconds();
     }
 

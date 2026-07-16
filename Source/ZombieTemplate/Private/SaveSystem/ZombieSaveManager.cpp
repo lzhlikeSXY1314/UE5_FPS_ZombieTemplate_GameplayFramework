@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Characters/ZombiePlayer.h"
 #include "Items/WeaponBase.h"
+#include <Characters/ZombieBase.h>
 
 const FString UZombieSaveManager::SaveSlotPrefix = TEXT("ZombieSaveSlot_");
 
