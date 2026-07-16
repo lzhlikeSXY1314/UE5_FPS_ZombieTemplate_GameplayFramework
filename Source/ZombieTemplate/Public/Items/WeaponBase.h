@@ -8,6 +8,7 @@
 #include "Items/ProjectileBase.h"
 #include <Components/SpotLightComponent.h>
 #include <Datas/WeaponData.h>
+#include "SaveSystem/SaveableActor.h" 
 #include "WeaponBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAmmoEmptyStateChanged, bool, bIsEmpty);
@@ -31,6 +32,22 @@ public:
     // ---------- 委托 ----------
     UPROPERTY(BlueprintAssignable, Category = "Interact")
     FOnInteract OnInteract;
+
+#pragma region SaveActorInterface
+public:
+    // 接口实现
+    virtual FName GetUniqueSaveID_Implementation() const override;
+    virtual FActorSaveData GetSaveData_Implementation() const override;
+    virtual void RestoreState_Implementation(const FActorSaveData& Data) override;
+    virtual void ResetToDefault_Implementation() override;
+
+    void RefreshAttachmentVisuals();
+    void SoftReset();
+private:
+    FTransform OriginalWorldTransform;   // 记录关卡设计时的位置
+
+#pragma endregion 
+
 
     // ========================================================================
     //  Region: 组件与 Socket

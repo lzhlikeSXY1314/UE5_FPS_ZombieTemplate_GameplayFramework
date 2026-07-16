@@ -6,14 +6,30 @@
 #include "GameFramework/Actor.h"
 #include "Interface/Interactable.h"
 #include "Components/WidgetComponent.h"  
+#include "SaveSystem/SaveableActor.h"
 #include "InspectableItem.generated.h"
 
 UCLASS()
-class ZOMBIETEMPLATE_API AInspectableItem : public AActor, public IInteractable
+class ZOMBIETEMPLATE_API AInspectableItem : public AActor, public IInteractable, public ISaveableActor
 {
 	GENERATED_BODY()
 	
 public:	
+	//------´æµµ½Ó¿Ú------//
+	virtual FName GetUniqueSaveID_Implementation() const override;
+	virtual FActorSaveData GetSaveData_Implementation() const override;
+	virtual void RestoreState_Implementation(const FActorSaveData& Data) override;
+	virtual void ResetToDefault_Implementation() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Save")
+	FName SaveActorID;
+protected:
+	FTransform OriginalWorldTransform;
+
+
+public:
+
+
 	// Sets default values for this actor's properties
 	AInspectableItem();
 

@@ -189,8 +189,9 @@ public:
     UFUNCTION()
     void UpdateFOV(float Value);
 
+    void ClearCurrentWeapon();
 
-
+    void EquipWeaponDirect(AWeaponBase* Weapon);
 private:
     void PlayADSSound(bool bStart);
     void SetAimingState(bool bAiming);

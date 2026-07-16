@@ -4,6 +4,39 @@
 #include "Items/InspectableItem.h"
 
 
+FName AInspectableItem::GetUniqueSaveID_Implementation() const
+{
+    // 如果指定了 SaveActorID，优先使用（用于动态生成的掉落物）
+    if (SaveActorID != NAME_None)
+        return SaveActorID;
+    // 否则使用默认 FName（适用于关卡中放置的物品）
+    return GetFName();
+}
+
+FActorSaveData AInspectableItem::GetSaveData_Implementation() const
+{
+    FActorSaveData Data;
+    Data.ActorID = GetUniqueSaveID_Implementation();
+    Data.ActorClassPath = GetClass()->GetPathName();
+    Data.WorldTransform = GetActorTransform();
+    // 基本物品没有弹药、配件等，保持默认即可
+    return Data;
+}
+
+void AInspectableItem::RestoreState_Implementation(const FActorSaveData& Data)
+{
+    SetActorTransform(Data.WorldTransform);
+}
+
+void AInspectableItem::ResetToDefault_Implementation()
+{ 
+    // 如果记录过原始位置（静态放置的物品），则恢复之
+    if (!OriginalWorldTransform.GetLocation().IsNearlyZero())
+    {
+        SetActorTransform(OriginalWorldTransform);
+    }
+}
+
 // Sets default values
 AInspectableItem::AInspectableItem()
 {
@@ -60,4 +93,6 @@ void AInspectableItem::BeginPlay()
     VisualMesh->SetSimulatePhysics(true);
     VisualMesh->SetEnableGravity(true);
     VisualMesh->SetWorldScale3D(MeshScale);
+
+    OriginalWorldTransform = GetActorTransform(); //SaveGame
 }

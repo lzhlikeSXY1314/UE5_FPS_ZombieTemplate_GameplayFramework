@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "SaveableActor.h"
 #include "ZombieSaveGame.generated.h"
+
 
 /** 玩家武器状态（将来扩展） */
 USTRUCT(BlueprintType)
@@ -54,6 +56,19 @@ public:
     /** 自定义显示名称（例如玩家输入的名字） */
     UPROPERTY(SaveGame)
     FString SaveDisplayName;
+
+    UPROPERTY(SaveGame)
+    int32 ReserveAmmo = 0;
+
+
+
+    /** 所有可保存 Actor 的状态列表 */
+    UPROPERTY()
+    TArray<FActorSaveData> ActorSaveDataList;
+
+    /** 玩家当前装备武器的 ID（空表示未装备） */
+    UPROPERTY()
+    FName EquippedWeaponID;
 
     /** 清空所有数据（用于新游戏） */
     UFUNCTION(BlueprintCallable, Category = "SaveGame")

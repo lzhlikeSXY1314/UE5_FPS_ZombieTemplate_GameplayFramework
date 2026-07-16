@@ -344,6 +344,40 @@ void AZombiePlayer::UpdateFOV(float Value)
     UpdateArmsFromFOV(Value);
 }
 
+void AZombiePlayer::ClearCurrentWeapon()
+{
+    if (CurrentWeapon)
+    {
+        CurrentWeapon->Drop();
+    }
+    CurrentWeapon = nullptr;
+    CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
+}
+
+void AZombiePlayer::EquipWeaponDirect(AWeaponBase* Weapon)
+{
+    // 无效或已经是同一把武器则跳过
+    if (!Weapon || Weapon == CurrentWeapon) return;
+
+    // 先安全卸载当前武器（会恢复旧武器的世界位置，但不会生成掉落物，因为Drop会按正常流程走）
+    if (CurrentWeapon)
+    {
+        CurrentWeapon->Drop();
+        CurrentWeapon = nullptr;
+    }
+
+    // 调用武器自身的装备逻辑（Attach到指定Socket，设置bIsEquipped等）
+    Weapon->Equip(this);
+
+    // 确认装备成功，更新玩家状态（但不要播放拾取蒙太奇）
+    if (Weapon->IsEquipped())
+    {
+        CurrentWeapon = Weapon;
+        CurrentAnimState = EPlayerAnimState::CG_Handgun_AnimState;
+        // 注意：这里故意省略 PlayPickUpMontage()，避免加载存档时播放动画
+    }
+}
+
 void AZombiePlayer::UpdateArmsFromFOV(float FOVValue)
 {
     if (!FPSSkeletalMesh || !CurrentWeapon || !CurrentWeapon->ScopeMesh || !CurrentWeapon->bScopeEquipped) return;

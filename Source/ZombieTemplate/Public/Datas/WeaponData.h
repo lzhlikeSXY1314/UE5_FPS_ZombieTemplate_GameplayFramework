@@ -168,6 +168,9 @@ struct FWeaponAttachmentConfig
     TSubclassOf<AActor> SilencerDropClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scope")
+    TSubclassOf<AActor> ScopeDropClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scope")
     FVector ArmsLocCorrection = FVector(0.0f, 0.0f, -1.484848f);
 };
 

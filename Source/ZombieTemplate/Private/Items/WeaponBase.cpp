@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Items/WeaponBase.h"
@@ -15,7 +15,7 @@ AWeaponBase::AWeaponBase()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	// ´´½¨ÎäÆ÷¹Ç÷ÀÍø¸ñÌå£¬¸½×Åµ½¸ù×é¼ş£¨Root£©
+	// åˆ›å»ºæ­¦å™¨éª¨éª¼ç½‘æ ¼ä½“ï¼Œé™„ç€åˆ°æ ¹ç»„ä»¶ï¼ˆRootï¼‰
 	Weapon_SKMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Weapon_SKMesh"));
 	Weapon_SKMesh->SetupAttachment(RootComponent);
 	Weapon_SKMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -23,69 +23,69 @@ AWeaponBase::AWeaponBase()
     Weapon_SKMesh->SetCastShadow(false);
 
     CompensatorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CompensatorMesh"));
-    CompensatorMesh->SetupAttachment(Weapon_SKMesh, MuzzleSocketName); // »ò×Ô¶¨Òå Socket
+    CompensatorMesh->SetupAttachment(Weapon_SKMesh, MuzzleSocketName); // æˆ–è‡ªå®šä¹‰ Socket
     CompensatorMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     CompensatorMesh->SetVisibility(false);
     CompensatorMesh->SetCastShadow(false);
 
-    // Ãé×¼¾µ²Û¸Ç×é¼ş
+    // ç„å‡†é•œæ§½ç›–ç»„ä»¶
     ScopeSlotCoverMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ScopeSlotCoverMesh"));
     ScopeSlotCoverMesh->SetupAttachment(Weapon_SKMesh, ScopeSlotCoverSocketName);
     ScopeSlotCoverMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    ScopeSlotCoverMesh->SetVisibility(true);   // Ä¬ÈÏÏÔÊ¾£¨ÎŞÃé×¼¾µ×´Ì¬£©
+    ScopeSlotCoverMesh->SetVisibility(true);   // é»˜è®¤æ˜¾ç¤ºï¼ˆæ— ç„å‡†é•œçŠ¶æ€ï¼‰
     ScopeSlotCoverMesh->SetCastShadow(false);
 
-    // ÏûÒôÆ÷×é¼ş
+    // æ¶ˆéŸ³å™¨ç»„ä»¶
     SilencerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SilencerMesh"));
     SilencerMesh->SetupAttachment(Weapon_SKMesh, MuzzleSocketName);
     SilencerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SilencerMesh->SetVisibility(false);   // Ä¬ÈÏÒş²Ø
+    SilencerMesh->SetVisibility(false);   // é»˜è®¤éšè—
     SilencerMesh->SetCastShadow(false);
 
-    // Ãé×¼¾µ×é¼ş
+    // ç„å‡†é•œç»„ä»¶
     ScopeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ScopeMesh"));
     ScopeMesh->SetupAttachment(Weapon_SKMesh, ScopeSocketName);
     ScopeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    ScopeMesh->SetVisibility(false);   // Ä¬ÈÏÒş²Ø
+    ScopeMesh->SetVisibility(false);   // é»˜è®¤éšè—
     ScopeMesh->SetCastShadow(false);
 
     CaseEjectPS = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("CaseEjectPS"));
-    CaseEjectPS->SetupAttachment(Weapon_SKMesh, NAME_None);  // »òÊ¹ÓÃ×¨ÓÃ Socket
+    CaseEjectPS->SetupAttachment(Weapon_SKMesh, NAME_None);  // æˆ–ä½¿ç”¨ä¸“ç”¨ Socket
     CaseEjectPS->SetRelativeLocation(FVector(2.655801f, 0.000002f, 7.487558f));
     CaseEjectPS->bAutoActivate = false;
-    CaseEjectPS->SetVisibility(true);   // µ«²»»á×Ô¶¯²¥·Å
+    CaseEjectPS->SetVisibility(true);   // ä½†ä¸ä¼šè‡ªåŠ¨æ’­æ”¾
     CaseEjectPS->SetCastShadow(false);
 
-    // ---------- ÊÖµçÍ²Íâ¿Ç ----------
+    // ---------- æ‰‹ç”µç­’å¤–å£³ ----------
     FlashlightMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FlashlightMesh"));
     FlashlightMesh->SetupAttachment(Weapon_SKMesh, FlashlightSocketName);
     FlashlightMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     FlashlightMesh->SetVisibility(false);
-    // ºöÂÔËùÓĞÅö×²Í¨µÀ£¨ÒÑÔÚ×Ô¶¨ÒåÅö×²Ô¤ÉèÖĞÒşº¬£¬Ò²¿ÉÏÔÊ½ÉèÖÃ£©
+    // å¿½ç•¥æ‰€æœ‰ç¢°æ’é€šé“ï¼ˆå·²åœ¨è‡ªå®šä¹‰ç¢°æ’é¢„è®¾ä¸­éšå«ï¼Œä¹Ÿå¯æ˜¾å¼è®¾ç½®ï¼‰
     FlashlightMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
     FlashlightMesh->SetCastShadow(false);
 
-    // ---------- ¼¤¹âÖ¸Ê¾Æ÷Ä£ĞÍ£¨¸½×ÅÔÚÊÖµçÍ²Íâ¿ÇÉÏ£© ----------
+    // ---------- æ¿€å…‰æŒ‡ç¤ºå™¨æ¨¡å‹ï¼ˆé™„ç€åœ¨æ‰‹ç”µç­’å¤–å£³ä¸Šï¼‰ ----------
     LaserBodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserBodyMesh"));
     LaserBodyMesh->SetupAttachment(FlashlightMesh);
     LaserBodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     LaserBodyMesh->SetVisibility(false);
     LaserBodyMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
-    // ÉèÖÃÏà¶ÔËõ·Å (X=2, Y=0.2, Z=0.2)
+    // è®¾ç½®ç›¸å¯¹ç¼©æ”¾ (X=2, Y=0.2, Z=0.2)
     LaserBodyMesh->SetRelativeScale3D(FVector(2.0f, 0.2f, 0.2f));
     LaserBodyMesh->SetCastShadow(false);
 
-    // ---------- ¼¤¹âµã¹âÔ´£¨¸½×ÅÔÚÊÖµçÍ²Íâ¿ÇÉÏ£© ----------
+    // ---------- æ¿€å…‰ç‚¹å…‰æºï¼ˆé™„ç€åœ¨æ‰‹ç”µç­’å¤–å£³ä¸Šï¼‰ ----------
     LaserDot = CreateDefaultSubobject<UPointLightComponent>(TEXT("LaserDot"));
     LaserDot->SetupAttachment(FlashlightMesh);
     LaserDot->SetVisibility(false);
     LaserDot->SetIntensity(15000.0f);
     LaserDot->SetLightColor(FColor::Red, true);
     LaserDot->SetAttenuationRadius(2.0f);
-    LaserDot->SetCastShadows(false);   // ¿ÉÑ¡£¬Ğ¡µã¹âÔ´Ã»±ØÒªÒõÓ°
+    LaserDot->SetCastShadows(false);   // å¯é€‰ï¼Œå°ç‚¹å…‰æºæ²¡å¿…è¦é˜´å½±
 
 
-    // ---------- ¾Û¹âµÆ£¨ÊÖµçÍ²¹âÖù£¬¸½×ÅÔÚÊÖµçÍ²Íâ¿ÇÉÏ£© ----------
+    // ---------- èšå…‰ç¯ï¼ˆæ‰‹ç”µç­’å…‰æŸ±ï¼Œé™„ç€åœ¨æ‰‹ç”µç­’å¤–å£³ä¸Šï¼‰ ----------
     FlashlightBeam = CreateDefaultSubobject<USpotLightComponent>(TEXT("FlashlightBeam"));
     FlashlightBeam->SetupAttachment(FlashlightMesh);
     FlashlightBeam->SetVisibility(false);
@@ -100,15 +100,143 @@ AWeaponBase::AWeaponBase()
 void AWeaponBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    if (bLightAttachmentEquipped)   // ¼¤¹âÊ¼ÖÕ¸üĞÂ
+    if (bLightAttachmentEquipped)   // æ¿€å…‰å§‹ç»ˆæ›´æ–°
     {
         UpdateLaserTarget();
     }
 }
 
+FName AWeaponBase::GetUniqueSaveID_Implementation() const
+{
+    return GetFName();
+}
+
+FActorSaveData AWeaponBase::GetSaveData_Implementation() const
+{
+    FActorSaveData Data;
+    Data.ActorID = GetFName();
+    Data.ActorClassPath = GetClass()->GetPathName();
+    Data.CurrentAmmo = CurrentAmmo;
+    // é…ä»¶çŠ¶æ€
+    Data.bCompensatorEquipped = bCompensatorEquipped;
+    Data.bSilencerEquipped = bSilencerEquipped;
+    Data.bScopeEquipped = bScopeEquipped;
+    Data.bLightAttachmentEquipped = bLightAttachmentEquipped;
+    Data.bFlashlightBeamOn = bFlashlightBeamOn;
+    if (bIsEquipped && GetAttachParentActor())
+    {
+        Data.bEquipped = true;
+        Data.EquipSocket = AttachSocketName;
+        Data.RelativeTransform = GetActorTransform().GetRelativeTransform(
+            GetAttachParentActor()->GetActorTransform()
+        );
+    }
+    else
+    {
+        Data.bEquipped = false;
+        Data.WorldTransform = GetActorTransform();
+    }
+    return Data;
+
+
+}
+
+void AWeaponBase::RestoreState_Implementation(const FActorSaveData& Data)
+{
+    // å¼¹è¯
+    CurrentAmmo = Data.CurrentAmmo;
+
+    bCompensatorEquipped = Data.bCompensatorEquipped;
+    bSilencerEquipped = Data.bSilencerEquipped;
+    bScopeEquipped = Data.bScopeEquipped;
+    bLightAttachmentEquipped = Data.bLightAttachmentEquipped;
+    bFlashlightBeamOn = Data.bFlashlightBeamOn;
+
+    bCanDismember = Data.bCompensatorEquipped;
+
+    if (!Data.bEquipped)  SetActorTransform(Data.WorldTransform);
+
+    RefreshAttachmentVisuals();
+}
+
+void AWeaponBase::ResetToDefault_Implementation()
+{
+    if (GetAttachParentActor()) DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+    SetActorTransform(OriginalWorldTransform);
+    bIsEquipped = false;
+    SetOwner(nullptr);          
+    CachedHandsMesh = nullptr;  
+
+    if (Weapon_SKMesh) Weapon_SKMesh->SetVisibility(false);
+    if (VisualMesh) VisualMesh->SetVisibility(true);
+    // æ¢å¤æ‰è½ç‰©ç†å’Œè§†è§‰ï¼ˆVisualMeshï¼‰
+    EnableWeaponPhysics();
+
+    bCompensatorEquipped = false;
+    bSilencerEquipped = false;
+    bScopeEquipped = false;
+    bLightAttachmentEquipped = false;
+    bFlashlightBeamOn = false;
+
+    // å…³é—­å…‰æºï¼ˆé˜²æ­¢æ¼‚åœ¨ç©ºä¸­ï¼‰
+    if (LaserDot) LaserDot->SetVisibility(false);         // â† åŠ ä¸Š
+    if (FlashlightBeam) FlashlightBeam->SetVisibility(false); // â† åŠ ä¸Š
+    // æ¸…é™¤å®šæ—¶å™¨
+    if (GetWorldTimerManager().IsTimerActive(SmokeDelayTimer))
+        GetWorldTimerManager().ClearTimer(SmokeDelayTimer);   // â† åŠ ä¸Š  Dropå‡½æ•°å‚è€ƒ
+
+
+    bCanDismember = false;
+    DismemberPower = 1;
+
+    if (WeaponData) CurrentAmmo = WeaponData->AmmoAndUIConfig.MaxAmmo;
+
+    RefreshAttachmentVisuals();
+
+}
+
+void AWeaponBase::RefreshAttachmentVisuals()
+{
+    if (CompensatorMesh)
+        CompensatorMesh->SetVisibility(bCompensatorEquipped);
+    if (SilencerMesh)
+        SilencerMesh->SetVisibility(bSilencerEquipped);
+    if (ScopeMesh)
+        ScopeMesh->SetVisibility(bScopeEquipped);
+    if (ScopeSlotCoverMesh)
+        ScopeSlotCoverMesh->SetVisibility(!bScopeEquipped); // æ— é•œæ—¶ç›–å­æ˜¾ç¤º
+
+    if (FlashlightMesh)
+        FlashlightMesh->SetVisibility(bLightAttachmentEquipped);
+    if (LaserBodyMesh)
+        LaserBodyMesh->SetVisibility(bLightAttachmentEquipped);
+    if (LaserDot)
+        LaserDot->SetVisibility(bLightAttachmentEquipped);
+    if (FlashlightBeam)
+        FlashlightBeam->SetVisibility(bLightAttachmentEquipped && bFlashlightBeamOn);
+}
+
+void AWeaponBase::SoftReset()
+{ 
+    // é‡ç½®é…ä»¶æ ‡å¿—ï¼ˆä¸ç”Ÿæˆæ‰è½ç‰©ï¼Œåªæ”¹æ ‡å¿—ï¼‰
+    bCompensatorEquipped = false;
+    bSilencerEquipped = false;
+    bScopeEquipped = false;
+    bLightAttachmentEquipped = false;
+    bFlashlightBeamOn = false;
+
+    bCanDismember = false;
+    DismemberPower = 1;
+
+    if (WeaponData)
+        CurrentAmmo = WeaponData->AmmoAndUIConfig.MaxAmmo;
+
+    RefreshAttachmentVisuals();
+}
+
 void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) const
 {
-    // ========== ¼ÆËãÍ¼±êÎÆÀí£¨Î»ÑÚÂë + »ØÍË£© ==========
+    // ========== è®¡ç®—å›¾æ ‡çº¹ç†ï¼ˆä½æ©ç  + å›é€€ï¼‰ ==========
     auto TryGetIcon = [this](int32 Flags) -> UTexture2D*
         {
             if (WeaponData->AmmoAndUIConfig.WeaponIconTextures.IsValidIndex(Flags))
@@ -119,31 +247,31 @@ void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) c
         };
 
     int32 Flags = 0;
-    if (bLightAttachmentEquipped)   Flags |= 1;   // ÊÖµçÍ²/¼¤¹â
-    if (bSilencerEquipped)          Flags |= 2;   // ÏûÒôÆ÷
-    if (bCompensatorEquipped)       Flags |= 4;   // ²¹³¥Æ÷
-    if (bScopeEquipped)             Flags |= 8;   // Ãé×¼¾µ
+    if (bLightAttachmentEquipped)   Flags |= 1;   // æ‰‹ç”µç­’/æ¿€å…‰
+    if (bSilencerEquipped)          Flags |= 2;   // æ¶ˆéŸ³å™¨
+    if (bCompensatorEquipped)       Flags |= 4;   // è¡¥å¿å™¨
+    if (bScopeEquipped)             Flags |= 8;   // ç„å‡†é•œ
 
-    // ³¢ÊÔÍêÕû×éºÏ
+    // å°è¯•å®Œæ•´ç»„åˆ
     OutIcon = TryGetIcon(Flags);
 
-    // »ØÍË£ºÏûÒôÆ÷Óë²¹³¥Æ÷»¥³â£¬Èô¶¼×°±¸ÔòÓÅÏÈ±£ÁôÏûÒôÆ÷£¬È¥µô²¹³¥Æ÷
+    // å›é€€ï¼šæ¶ˆéŸ³å™¨ä¸è¡¥å¿å™¨äº’æ–¥ï¼Œè‹¥éƒ½è£…å¤‡åˆ™ä¼˜å…ˆä¿ç•™æ¶ˆéŸ³å™¨ï¼Œå»æ‰è¡¥å¿å™¨
     if (!OutIcon && (Flags & 4))
     {
         OutIcon = TryGetIcon(Flags & ~4);
     }
-    // Èç¹û»¹²»ĞĞ£¬Ôò±£Áô²¹³¥Æ÷£¬È¥µôÏûÒôÆ÷
+    // å¦‚æœè¿˜ä¸è¡Œï¼Œåˆ™ä¿ç•™è¡¥å¿å™¨ï¼Œå»æ‰æ¶ˆéŸ³å™¨
     if (!OutIcon && (Flags & 2))
     {
         OutIcon = TryGetIcon(Flags & ~2);
     }
-    // ×îÖÕ¶µµ×£ºÎŞÈÎºÎ¸½¼ş
+    // æœ€ç»ˆå…œåº•ï¼šæ— ä»»ä½•é™„ä»¶
     if (!OutIcon)
     {
         OutIcon = TryGetIcon(0);
     }
 
-    // ========== ¼ÆËãËõ·Å ==========
+    // ========== è®¡ç®—ç¼©æ”¾ ==========
     if (bCompensatorEquipped)
     {
         OutScale = WeaponData->AmmoAndUIConfig.CompensatorIconScale;
@@ -159,8 +287,6 @@ void AWeaponBase::GetWeaponIconAndScale(UTexture2D*& OutIcon, float& OutScale) c
 
 }
 
-
-
 void AWeaponBase::OnConstruction(const FTransform& Transform)
 {
 
@@ -172,12 +298,11 @@ void AWeaponBase::OnConstruction(const FTransform& Transform)
 void AWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
-    InitializeProjectilePool(); // ³õÊ¼»¯¶ÔÏó³Ø
+    InitializeProjectilePool(); // åˆå§‹åŒ–å¯¹è±¡æ± 
     SaveBaseAttributes();
-   
-   
-    // ¶¯Ì¬´´½¨ÑÌÎíÁ£×Ó³Ø£¨²»ÄÜÔÚ BeginPlay ÖĞÓÃ CreateDefaultSubobject£©
-    if (WeaponData && Weapon_SKMesh && MuzzleSmokePool.Num() == 0) // ·ÀÖ¹ÖØ¸´´´½¨
+ 
+    // åŠ¨æ€åˆ›å»ºçƒŸé›¾ç²’å­æ± ï¼ˆä¸èƒ½åœ¨ BeginPlay ä¸­ç”¨ CreateDefaultSubobjectï¼‰
+    if (WeaponData && Weapon_SKMesh && MuzzleSmokePool.Num() == 0) // é˜²æ­¢é‡å¤åˆ›å»º
     {
         for (int32 i = 0; i < WeaponData->VisualFX.MuzzleSmokePoolSize; ++i)
         {
@@ -187,17 +312,17 @@ void AWeaponBase::BeginPlay()
             SmokeComp->bAutoActivate = false;
             SmokeComp->SetRelativeLocation(FVector::ZeroVector);
             SmokeComp->SetRelativeScale3D(WeaponData->VisualFX.MuzzleSmokeScale);
-            SmokeComp->RegisterComponent();          // ±ØĞë×¢²á
+            SmokeComp->RegisterComponent();          // å¿…é¡»æ³¨å†Œ
             SmokeComp->SetVisibility(true);
             MuzzleSmokePool.Add(SmokeComp);
         }
     }
 
-
     OriginalDismemberPower = DismemberPower;
+
+    OriginalWorldTransform = GetActorTransform();
+
 }
-
-
 
 void AWeaponBase::OnInteract_Implementation(AActor* Interactor)
 {
@@ -216,12 +341,12 @@ void AWeaponBase::Equip(AActor* NewOwner)
         Weapon_SKMesh->SetVisibility(true);
     }
 
-    // È·¶¨Òª¸½×ÅµÄ¹Ç÷ÀÍø¸ñÌå
+    // ç¡®å®šè¦é™„ç€çš„éª¨éª¼ç½‘æ ¼ä½“
     USkeletalMeshComponent* AttachTargetMesh = nullptr;
 
     if (ACharacter* Character = Cast<ACharacter>(NewOwner))
     {
-        // ÓÅÏÈ²éÕÒ´øÓĞ "FPSMesh" ±êÇ©µÄ¹Ç÷ÀÍø¸ñÌå£¨µÚÒ»ÈË³ÆÊÖ±Û£©
+        // ä¼˜å…ˆæŸ¥æ‰¾å¸¦æœ‰ "FPSMesh" æ ‡ç­¾çš„éª¨éª¼ç½‘æ ¼ä½“ï¼ˆç¬¬ä¸€äººç§°æ‰‹è‡‚ï¼‰
         TArray<USkeletalMeshComponent*> SkelComps;
         Character->GetComponents<USkeletalMeshComponent>(SkelComps);
         for (USkeletalMeshComponent* Comp : SkelComps)
@@ -234,7 +359,7 @@ void AWeaponBase::Equip(AActor* NewOwner)
             }
         }
 
-        // Èç¹ûÃ»ÕÒµ½£¬»ØÍËµ½Ä¬ÈÏµÄµÚÈıÈË³Æ Mesh
+        // å¦‚æœæ²¡æ‰¾åˆ°ï¼Œå›é€€åˆ°é»˜è®¤çš„ç¬¬ä¸‰äººç§° Mesh
         if (!AttachTargetMesh)
         {
             AttachTargetMesh = Character->GetMesh();
@@ -249,10 +374,10 @@ void AWeaponBase::Equip(AActor* NewOwner)
     }
     else
     {
-        // ÕÒ²»µ½ºÏÊÊÍø¸ñÌå£¬»Ö¸´µôÂä×´Ì¬£¨¶ªÆú£©
+        // æ‰¾ä¸åˆ°åˆé€‚ç½‘æ ¼ä½“ï¼Œæ¢å¤æ‰è½çŠ¶æ€ï¼ˆä¸¢å¼ƒï¼‰
         EnableWeaponPhysics();
         if (Weapon_SKMesh) Weapon_SKMesh->SetVisibility(false);
-        return; // Ö±½Ó·µ»Ø£¬²»±ê¼ÇÎªÒÑ×°±¸
+        return; // ç›´æ¥è¿”å›ï¼Œä¸æ ‡è®°ä¸ºå·²è£…å¤‡
     }
 
     SetOwner(NewOwner);
@@ -263,7 +388,7 @@ void AWeaponBase::Equip(AActor* NewOwner)
         GetWorld()->GetTimerManager().SetTimer(LaserDotVisibilityTimer,
             [this]()
             {
-                // ½öÔÚ×°±¸×´Ì¬ÈÔÓĞĞ§ÇÒ¸½¼şÈÔ×°±¸Ê±ÏÔÊ¾
+                // ä»…åœ¨è£…å¤‡çŠ¶æ€ä»æœ‰æ•ˆä¸”é™„ä»¶ä»è£…å¤‡æ—¶æ˜¾ç¤º
                 if (bIsEquipped && bLightAttachmentEquipped && LaserDot)
                 {
                     LaserDot->SetVisibility(true);
@@ -280,12 +405,12 @@ void AWeaponBase::EquipCompensator()
 {
     if (!bIsEquipped) return;
     
-    if (bSilencerEquipped) RemoveSilencer(); // »¥³â
+    if (bSilencerEquipped) RemoveSilencer(); // äº’æ–¥
 
     if (CompensatorMesh) CompensatorMesh->SetVisibility(true);
     if (WeaponData->AttachmentConfig.CompensatorFireSound) WeaponData->VisualFX.FireSound = WeaponData->AttachmentConfig.CompensatorFireSound;
     bCompensatorEquipped = true;
-    bCanDismember = true;   // ¡û ²¹³¥Æ÷¿ªÆô¶ÏÖ«
+    bCanDismember = true;   // â† è¡¥å¿å™¨å¼€å¯æ–­è‚¢
 
     OriginalDismemberPower = DismemberPower;
     DismemberPower = CompensatorDismemberPower;
@@ -294,21 +419,38 @@ void AWeaponBase::EquipCompensator()
 void AWeaponBase::RemoveCompensator()
 {
     if (!bCompensatorEquipped) return;
-    
+
+    // ç”Ÿæˆå‰æ¸…é™¤æ®‹ç•™çš„åŒ ID æ‰è½ç‰©
+    FName DropID = FName(*(GetName() + TEXT("_CompensatorDrop")));
+    TArray<AActor*> Existing;
+    UGameplayStatics::GetAllActorsWithInterface(GetWorld(), USaveableActor::StaticClass(), Existing);
+    for (AActor* Act : Existing)
+    {
+        if (Act && Act->Implements<USaveableActor>() &&
+            ISaveableActor::Execute_GetUniqueSaveID(Act) == DropID)
+        {
+            Act->Destroy();
+        }
+    }
+
+    // ç”Ÿæˆæ–°æ‰è½ç‰©
     if (WeaponData->AttachmentConfig.CompensatorDropClass && Weapon_SKMesh)
     {
         FVector SpawnLoc = Weapon_SKMesh->GetSocketLocation(MuzzleSocketName);
         FRotator SpawnRot = GetActorRotation();
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.CompensatorDropClass, SpawnLoc, SpawnRot, SpawnParams);
+        AActor* DropActor = GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.CompensatorDropClass, SpawnLoc, SpawnRot, SpawnParams);
+        if (AInspectableItem* Inspectable = Cast<AInspectableItem>(DropActor))
+        {
+            Inspectable->SaveActorID = DropID;
+        }
     }
 
     if (CompensatorMesh) CompensatorMesh->SetVisibility(false);
-    RestoreBaseAttributes(); 
+    RestoreBaseAttributes();
     bCompensatorEquipped = false;
     bCanDismember = false;
-
     DismemberPower = OriginalDismemberPower;
 }
 
@@ -325,8 +467,20 @@ void AWeaponBase::EquipSilencer()
 
 void AWeaponBase::RemoveSilencer()
 {
-    
     if (!bSilencerEquipped) return;
+
+    // ç”Ÿæˆå‰æ¸…é™¤æ®‹ç•™çš„åŒ ID æ‰è½ç‰©
+    FName DropID = FName(*(GetName() + TEXT("_SilencerDrop")));
+    TArray<AActor*> Existing;
+    UGameplayStatics::GetAllActorsWithInterface(GetWorld(), USaveableActor::StaticClass(), Existing);
+    for (AActor* Act : Existing)
+    {
+        if (Act && Act->Implements<USaveableActor>() &&
+            ISaveableActor::Execute_GetUniqueSaveID(Act) == DropID)
+        {
+            Act->Destroy();
+        }
+    }
 
     if (WeaponData->AttachmentConfig.SilencerDropClass && Weapon_SKMesh)
     {
@@ -334,7 +488,12 @@ void AWeaponBase::RemoveSilencer()
         FRotator SpawnRot = GetActorRotation();
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.SilencerDropClass, SpawnLoc, SpawnRot, SpawnParams);
+        AActor* DropActor = GetWorld()->SpawnActor<AActor>(WeaponData->AttachmentConfig.SilencerDropClass, SpawnLoc, SpawnRot, SpawnParams);
+
+        if (AInspectableItem* Inspectable = Cast<AInspectableItem>(DropActor))
+        {
+            Inspectable->SaveActorID = DropID;
+        }
     }
 
     if (SilencerMesh) SilencerMesh->SetVisibility(false);
@@ -353,8 +512,38 @@ void AWeaponBase::EquipScope()
 
 void AWeaponBase::RemoveScope()
 {
-    
     if (!bScopeEquipped) return;
+
+    // ç”Ÿæˆå‰æ¸…é™¤æ®‹ç•™çš„åŒ ID æ‰è½ç‰©
+    FName DropID = FName(*(GetName() + TEXT("_ScopeDrop")));
+    TArray<AActor*> Existing;
+    UGameplayStatics::GetAllActorsWithInterface(GetWorld(), USaveableActor::StaticClass(), Existing);
+    for (AActor* Act : Existing)
+    {
+        if (Act && Act->Implements<USaveableActor>() &&
+            ISaveableActor::Execute_GetUniqueSaveID(Act) == DropID)
+        {
+            Act->Destroy();
+        }
+    }
+
+    if (WeaponData->AttachmentConfig.ScopeDropClass && Weapon_SKMesh)
+    {
+        FVector SpawnLoc = Weapon_SKMesh->GetSocketLocation(ScopeSocketName);
+        FRotator SpawnRot = GetActorRotation();
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        AActor* DropActor = GetWorld()->SpawnActor<AActor>(
+            WeaponData->AttachmentConfig.ScopeDropClass,
+            SpawnLoc, SpawnRot, SpawnParams
+        );
+
+        if (AInspectableItem* Inspectable = Cast<AInspectableItem>(DropActor))
+        {
+            Inspectable->SaveActorID = DropID;
+        }
+    }
+
     if (ScopeMesh) ScopeMesh->SetVisibility(false);
     if (ScopeSlotCoverMesh) ScopeSlotCoverMesh->SetVisibility(true);
     bScopeEquipped = false;
@@ -363,13 +552,13 @@ void AWeaponBase::RemoveScope()
 
 void AWeaponBase::StartReload(int32 AmmoToAdd)
 {
-    // ¼ì²é×´Ì¬
+    // æ£€æŸ¥çŠ¶æ€
     if (!bIsEquipped || bIsReloading || AmmoToAdd <= 0 || CurrentAmmo >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
 
     bIsReloading = true;
-    PendingReloadAmount = AmmoToAdd;   // Ôİ´æÊıÁ¿£¬¶¯»­½áÊøÊ±Ê¹ÓÃ
+    PendingReloadAmount = AmmoToAdd;   // æš‚å­˜æ•°é‡ï¼ŒåŠ¨ç”»ç»“æŸæ—¶ä½¿ç”¨
 
-    // ²¥·ÅÊÖ²¿»»µ¯ÃÉÌ«Ææ
+    // æ’­æ”¾æ‰‹éƒ¨æ¢å¼¹è’™å¤ªå¥‡
     if (WeaponData->AnimMontageSet.ReloadMontage_Hands && CachedHandsMesh)
     {
         UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
@@ -382,7 +571,7 @@ void AWeaponBase::StartReload(int32 AmmoToAdd)
         }
     }
 
-    // ²¥·ÅÎäÆ÷×ÔÉí»»µ¯ÃÉÌ«Ææ
+    // æ’­æ”¾æ­¦å™¨è‡ªèº«æ¢å¼¹è’™å¤ªå¥‡
     if (WeaponData->AnimMontageSet.ReloadMontage_Weapon && Weapon_SKMesh)
     {
         UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
@@ -397,7 +586,7 @@ void AWeaponBase::StopReload()
 {
     if (!bIsReloading) return;
     bIsReloading = false;
-    // Í£Ö¹ÊÖ²¿ÃÉÌ«Ææ
+    // åœæ­¢æ‰‹éƒ¨è’™å¤ªå¥‡
     if (CachedHandsMesh && WeaponData->AnimMontageSet.ReloadMontage_Hands)
     {
         UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
@@ -406,7 +595,7 @@ void AWeaponBase::StopReload()
             HandsAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Hands);
         }
     }
-    // Í£Ö¹ÎäÆ÷ÃÉÌ«Ææ
+    // åœæ­¢æ­¦å™¨è’™å¤ªå¥‡
     if (Weapon_SKMesh && WeaponData->AnimMontageSet.ReloadMontage_Weapon)
     {
         UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
@@ -422,24 +611,24 @@ void AWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted)
     bIsReloading = false;
 
 
-    // Ö»ÓĞÕı³£½áÊøÇÒÓĞ´ı²¹³äµ¯Ò©Ê±²Å´¦Àí
+    // åªæœ‰æ­£å¸¸ç»“æŸä¸”æœ‰å¾…è¡¥å……å¼¹è¯æ—¶æ‰å¤„ç†
     if (!bInterrupted && PendingReloadAmount > 0)
     {
-        // Í¨ÖªÓµÓĞÕß£¨Íæ¼Ò£©ÏûºÄºó±¸µ¯Ò©£¬²¢»ñµÃÊµ¼Ê¿É²¹³äµÄÊıÁ¿
+        // é€šçŸ¥æ‹¥æœ‰è€…ï¼ˆç©å®¶ï¼‰æ¶ˆè€—åå¤‡å¼¹è¯ï¼Œå¹¶è·å¾—å®é™…å¯è¡¥å……çš„æ•°é‡
         AZombiePlayer* Player = Cast<AZombiePlayer>(GetOwner());
         int32 ActualAdded = 0;
         if (Player)
         {
-            // Íæ¼Ò·µ»ØÊµ¼ÊÏûºÄµÄºó±¸µ¯Ò©Êı£¨¿ÉÄÜÉÙÓÚÇëÇóÖµ£¬Èç¹ûºó±¸²»×ã£©
+            // ç©å®¶è¿”å›å®é™…æ¶ˆè€—çš„åå¤‡å¼¹è¯æ•°ï¼ˆå¯èƒ½å°‘äºè¯·æ±‚å€¼ï¼Œå¦‚æœåå¤‡ä¸è¶³ï¼‰
             ActualAdded = Player->ConsumeReserveAmmo(PendingReloadAmount);
         }
         else
         {
-            // Èç¹ûÓµÓĞÕß²»ÊÇÍæ¼Ò£¨ÀıÈçAI£©£¬ÔòÖ±½ÓÊ¹ÓÃ´ı²¹³äÁ¿£¨²»ÏûºÄºó±¸£©
+            // å¦‚æœæ‹¥æœ‰è€…ä¸æ˜¯ç©å®¶ï¼ˆä¾‹å¦‚AIï¼‰ï¼Œåˆ™ç›´æ¥ä½¿ç”¨å¾…è¡¥å……é‡ï¼ˆä¸æ¶ˆè€—åå¤‡ï¼‰
             ActualAdded = PendingReloadAmount;
         }
 
-        // Ìî³äÎäÆ÷µ¯Ò©£¬È·±£²»³¬¹ı×î´óÈİÁ¿
+        // å¡«å……æ­¦å™¨å¼¹è¯ï¼Œç¡®ä¿ä¸è¶…è¿‡æœ€å¤§å®¹é‡
         CurrentAmmo = FMath::Min(CurrentAmmo + ActualAdded, WeaponData->AmmoAndUIConfig.MaxAmmo);
         CheckAmmoStateChange();
     }
@@ -460,11 +649,11 @@ void AWeaponBase::EquipLightAttachment()
 {
     if (!bIsEquipped || bLightAttachmentEquipped) return;
    
-    // ÏÔÊ¾Íâ¿ÇºÍ¼¤¹âÄ£ĞÍ£¨¼¤¹âÒ»Ö±ÁÁ£©
+    // æ˜¾ç¤ºå¤–å£³å’Œæ¿€å…‰æ¨¡å‹ï¼ˆæ¿€å…‰ä¸€ç›´äº®ï¼‰
     if (FlashlightMesh) FlashlightMesh->SetVisibility(true);
     if (LaserBodyMesh) LaserBodyMesh->SetVisibility(true);
 
-    // ÊÖµçÍ²¹âÊø³õÊ¼¹Ø±Õ
+    // æ‰‹ç”µç­’å…‰æŸåˆå§‹å…³é—­
     if (FlashlightBeam) FlashlightBeam->SetVisibility(false);
     bFlashlightBeamOn = false;
     bLightAttachmentEquipped = true;
@@ -474,7 +663,7 @@ void AWeaponBase::EquipLightAttachment()
         GetWorld()->GetTimerManager().SetTimer(LaserDotVisibilityTimer,
             [this]()
             {
-                // ½öÔÚ×°±¸×´Ì¬ÈÔÓĞĞ§ÇÒ¸½¼şÈÔ×°±¸Ê±ÏÔÊ¾
+                // ä»…åœ¨è£…å¤‡çŠ¶æ€ä»æœ‰æ•ˆä¸”é™„ä»¶ä»è£…å¤‡æ—¶æ˜¾ç¤º
                 if (bIsEquipped && bLightAttachmentEquipped && LaserDot)
                 {
                     LaserDot->SetVisibility(true);
@@ -490,14 +679,14 @@ void AWeaponBase::RemoveLightAttachment()
 {
     if (!bLightAttachmentEquipped) return;
 
-    // Èç¹ûÊÖµçÍ²»¹¿ª×Å£¬ÏÈ¹Ø±Õ
+    // å¦‚æœæ‰‹ç”µç­’è¿˜å¼€ç€ï¼Œå…ˆå…³é—­
     if (FlashlightBeam && bFlashlightBeamOn)
     {
         FlashlightBeam->SetVisibility(false);
         bFlashlightBeamOn = false;
     }
 
-    // Òş²ØËùÓĞÄ£ĞÍ
+    // éšè—æ‰€æœ‰æ¨¡å‹
     if (FlashlightMesh) FlashlightMesh->SetVisibility(false);
     if (LaserBodyMesh) LaserBodyMesh->SetVisibility(false);
     if (LaserDot) LaserDot->SetVisibility(false);
@@ -508,13 +697,13 @@ void AWeaponBase::RemoveLightAttachment()
 void AWeaponBase::ToggleFlashlight(bool bIsAiming)
 {
     if (bIsReloading) return;
-    // ±ØĞëÒÑ×°±¸ÕÕÃ÷¸½¼ş
+    // å¿…é¡»å·²è£…å¤‡ç…§æ˜é™„ä»¶
     if (!bIsEquipped || !bLightAttachmentEquipped) return;
 
     bFlashlightBeamOn = !bFlashlightBeamOn;
     if (FlashlightBeam) FlashlightBeam->SetVisibility(bFlashlightBeamOn);
 
-    // ²¥·ÅÃÉÌ«ÆæºÍÒôĞ§
+    // æ’­æ”¾è’™å¤ªå¥‡å’ŒéŸ³æ•ˆ
     UAnimMontage* Montage = bIsAiming ? WeaponData->AnimMontageSet.SwitchLightMontage_ADS : WeaponData->AnimMontageSet.SwitchLightMontage_Hip;
     if (Montage && CachedHandsMesh)
     {
@@ -531,7 +720,7 @@ void AWeaponBase::UpdateLaserTarget()
 {
     if (!bIsEquipped || !LaserDot) return;
 
-    // 1. »ñÈ¡³ÖÓĞÕß£¨Íæ¼Ò£©µÄÉãÏñ»úÎ»ÖÃºÍ·½Ïò
+    // 1. è·å–æŒæœ‰è€…ï¼ˆç©å®¶ï¼‰çš„æ‘„åƒæœºä½ç½®å’Œæ–¹å‘
     AActor* OwnerActor = GetOwner();
     if (!OwnerActor) return;
 
@@ -543,7 +732,7 @@ void AWeaponBase::UpdateLaserTarget()
     OwnerController->GetPlayerViewPoint(CameraLoc, CameraRot);
     FVector AimDir = CameraRot.Vector();
 
-    // 2. ´ÓÉãÏñ»ú·¢ÉäÒ»ÌõÉäÏß£¨¾«È·ÎŞÉ¢²¼£©£¬µÃµ½×¼ĞÇÃé×¼µã
+    // 2. ä»æ‘„åƒæœºå‘å°„ä¸€æ¡å°„çº¿ï¼ˆç²¾ç¡®æ— æ•£å¸ƒï¼‰ï¼Œå¾—åˆ°å‡†æ˜Ÿç„å‡†ç‚¹
     FVector TraceStart = CameraLoc;
     FVector TraceEnd = TraceStart + AimDir * WeaponData->VisualFX.FireRange;
 
@@ -555,17 +744,17 @@ void AWeaponBase::UpdateLaserTarget()
     bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
     FVector ImpactPoint = bHit ? Hit.ImpactPoint : TraceEnd;
 
-    // 3. ¼ÆËã¼¤¹âµã¹âÔ´×îÖÕÎ»ÖÃ£¨ÑØ·¨ÏßÆ«ÒÆ±ÜÃâÏİÈëÇ½Ãæ£©
+    // 3. è®¡ç®—æ¿€å…‰ç‚¹å…‰æºæœ€ç»ˆä½ç½®ï¼ˆæ²¿æ³•çº¿åç§»é¿å…é™·å…¥å¢™é¢ï¼‰
     FVector OffsetDirection = bHit ? Hit.ImpactNormal : (-AimDir);
     FVector FinalLaserPoint = ImpactPoint + OffsetDirection * LaserDotDepthOffset;
 
-    // 4. ½«¼¤¹âµã¹âÔ´ÒÆ¶¯µ½¸ÃÎ»ÖÃ£¨Ã¿Ö¡ÉèÖÃ£¬ÁÙÊ±ÍÑÀë¸¸¼¶£©
+    // 4. å°†æ¿€å…‰ç‚¹å…‰æºç§»åŠ¨åˆ°è¯¥ä½ç½®ï¼ˆæ¯å¸§è®¾ç½®ï¼Œä¸´æ—¶è„±ç¦»çˆ¶çº§ï¼‰
     if (LaserDot)
     {
         LaserDot->SetWorldLocation(FinalLaserPoint);
     }
 
-    // 5. »æÖÆ´Ó¼¤¹â·¢Éä¿Úµ½Ä¿±êµãµÄÁ¬Ïß£¨Èç¹ûÓĞ LaserBodyMesh£©
+    // 5. ç»˜åˆ¶ä»æ¿€å…‰å‘å°„å£åˆ°ç›®æ ‡ç‚¹çš„è¿çº¿ï¼ˆå¦‚æœæœ‰ LaserBodyMeshï¼‰
     if (bDrawLaserDebug && LaserBodyMesh)
     {
         FVector LaserOrigin = LaserBodyMesh->GetComponentLocation();
@@ -594,7 +783,7 @@ float AWeaponBase::GetCurrentDamage() const
 {
     float FinalDamage = WeaponData->DamageConfig.Damage;
     if (bSilencerEquipped)   FinalDamage *= WeaponData->DamageConfig.SilencerDamageMultiplier;
-    // ²¹³¥Æ÷²»Ö±½ÓÓ°ÏìÉËº¦£¬Ö»¸ºÔğ¶ÏÖ«£¬¿ÉÔÚ´ËÀ©Õ¹
+    // è¡¥å¿å™¨ä¸ç›´æ¥å½±å“ä¼¤å®³ï¼Œåªè´Ÿè´£æ–­è‚¢ï¼Œå¯åœ¨æ­¤æ‰©å±•
     return FinalDamage;
 }
 
@@ -623,13 +812,13 @@ void AWeaponBase::Drop()
 {
     if (!bIsEquipped) return;
     if (bIsReloading) StopReload();
-    // ´ÓÓµÓĞÕß·ÖÀë
+    // ä»æ‹¥æœ‰è€…åˆ†ç¦»
     DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-    // »Ö¸´µôÂäÎïÀíºÍÊÓ¾õ£¨VisualMesh£©
+    // æ¢å¤æ‰è½ç‰©ç†å’Œè§†è§‰ï¼ˆVisualMeshï¼‰
     EnableWeaponPhysics();
 
-    // Òş²ØÎäÆ÷×¨ÓÃµÄ¹Ç÷ÀÍø¸ñÌå
+    // éšè—æ­¦å™¨ä¸“ç”¨çš„éª¨éª¼ç½‘æ ¼ä½“
     if (Weapon_SKMesh)
     {
         Weapon_SKMesh->SetVisibility(false);
@@ -659,9 +848,9 @@ void AWeaponBase::ActivatePooledSmoke()
     {
         if (SmokeComp && !SmokeComp->IsActive())
         {
-            // ¸üĞÂÆ«ÒÆ£¨¸ù¾İ¸½¼ş¶¯Ì¬±ä»¯£©
+            // æ›´æ–°åç§»ï¼ˆæ ¹æ®é™„ä»¶åŠ¨æ€å˜åŒ–ï¼‰
             SmokeComp->SetRelativeLocation(GetCurrentMuzzleSmokeOffset());
-            // Èç¹ûÄ£°åÎ´ÉèÖÃ£¬Ê¹ÓÃÎäÆ÷Ö¸¶¨µÄÁ£×Ó×Ê²ú
+            // å¦‚æœæ¨¡æ¿æœªè®¾ç½®ï¼Œä½¿ç”¨æ­¦å™¨æŒ‡å®šçš„ç²’å­èµ„äº§
             if (SmokeComp->Template == nullptr)
             {
                 SmokeComp->SetTemplate(WeaponData->VisualFX.MuzzleSmokeParticle);
@@ -703,7 +892,7 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
 {
     if (!Weapon_SKMesh) return;
 
-    // 1. ÊÖ±Û¶¯»­
+    // 1. æ‰‹è‡‚åŠ¨ç”»
     UAnimMontage* HandsMontage = bIsAiming ? WeaponData->AnimMontageSet.FireMontage_ADS_Hands : WeaponData->AnimMontageSet.FireMontage_Hip_Hands;
     if (HandsMontage && HandsMesh)
     {
@@ -711,14 +900,14 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
             AnimInstance->Montage_Play(HandsMontage);
     }
 
-    // 2. ÎäÆ÷×ÔÉí¶¯»­
+    // 2. æ­¦å™¨è‡ªèº«åŠ¨ç”»
     if (WeaponData->AnimMontageSet.FireMontage_Weapon)
     {
         if (UAnimInstance* AnimInstance = Weapon_SKMesh->GetAnimInstance())
             AnimInstance->Montage_Play(WeaponData->AnimMontageSet.FireMontage_Weapon);
     }
 
-    // 3. Ç¹¿Ú»ğÑæ
+    // 3. æªå£ç«ç„°
     if (WeaponData->VisualFX.MuzzleFlashParticle)
     {
         FVector ActualFlashOffset = GetCurrentMuzzleFlashOffset();
@@ -726,7 +915,7 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
             WeaponData->VisualFX.MuzzleFlashParticle,
             Weapon_SKMesh,
             MuzzleSocketName,
-            ActualFlashOffset,          // Ê¹ÓÃ¶¯Ì¬Æ«ÒÆ
+            ActualFlashOffset,          // ä½¿ç”¨åŠ¨æ€åç§»
             FRotator::ZeroRotator,
             WeaponData->VisualFX.MuzzleScale,
             EAttachLocation::SnapToTarget,
@@ -735,12 +924,12 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
     }
 
 
-// 4. Ç¹¿ÚÑÌÎí£¨ÑÓ³Ù´¥·¢ + ¶ÔÏó³Ø£©
+// 4. æªå£çƒŸé›¾ï¼ˆå»¶è¿Ÿè§¦å‘ + å¯¹è±¡æ± ï¼‰
     if (WeaponData->VisualFX.MuzzleSmokeParticle)
     {
         float CurrentTime = GetWorld()->GetTimeSeconds();
 
-        // ÀäÈ´ÖØÖÃ£º³¬¹ı 3 ÃëÎ´Éä»÷£¬¼ÆÊıÇåÁã
+        // å†·å´é‡ç½®ï¼šè¶…è¿‡ 3 ç§’æœªå°„å‡»ï¼Œè®¡æ•°æ¸…é›¶
         if (CurrentTime - LastShotTime > WeaponData->VisualFX.ShotCounterResetTime)
         {
             ConsecutiveShots = 0;
@@ -751,12 +940,12 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
 
         if (ConsecutiveShots >= WeaponData->VisualFX.ShotsToStartSmoke)
         {
-            ActivatePooledSmoke();  // ÄÚ²¿»á¸ù¾İ¼ÆÊı¿ØÖÆÑÌÎí¹æÄ£
+            ActivatePooledSmoke();  // å†…éƒ¨ä¼šæ ¹æ®è®¡æ•°æ§åˆ¶çƒŸé›¾è§„æ¨¡
         }
     }
    
 
-    // 5. ¿ª»ğÒôĞ§
+    // 5. å¼€ç«éŸ³æ•ˆ
     if (WeaponData->VisualFX.FireSound)
     {
         USceneComponent* AttachComp = Weapon_SKMesh ? Weapon_SKMesh : RootComponent;
@@ -766,7 +955,7 @@ void AWeaponBase::FireWeaponVisuals(const FVector& MuzzleLocation, const FRotato
             WeaponData->VisualFX.FireSoundAttenuation, WeaponData->VisualFX.FireSoundConcurrency, false);
     }
 
-    // 6µ¯¿ÇÅ×³ö
+    // 6å¼¹å£³æŠ›å‡º
     ActivateCaseEject();
 }
 
@@ -798,13 +987,13 @@ void AWeaponBase::ProcessHit(const FHitResult& Hit)
 {
     if (!Hit.bBlockingHit) return;
 
-    // »÷ÖĞÒôĞ§
+    // å‡»ä¸­éŸ³æ•ˆ
     if (WeaponData->VisualFX.ImpactSound)
     {
         UGameplayStatics::PlaySoundAtLocation(GetWorld(), WeaponData->VisualFX.ImpactSound, Hit.ImpactPoint);
     }
 
-    // µ¯¿×Ìù»¨
+    // å¼¹å­”è´´èŠ±
     if (WeaponData->VisualFX.BulletHoleDecalClass)
     {
         UPrimitiveComponent* HitComp = Hit.Component.Get();
@@ -815,7 +1004,7 @@ void AWeaponBase::ProcessHit(const FHitResult& Hit)
         }
     }
 
-    // ÎïÀí³åÁ¿µÈĞ§¹û¿ÉºóĞøÌí¼Ó
+    // ç‰©ç†å†²é‡ç­‰æ•ˆæœå¯åç»­æ·»åŠ 
 }
 
 AProjectileBase* AWeaponBase::GetPooledProjectile()
@@ -829,9 +1018,9 @@ AProjectileBase* AWeaponBase::GetPooledProjectile()
     if (GEngine)
     {
         GEngine->AddOnScreenDebugMessage(
-            -1,               // Key: -1 ±íÊ¾Ã¿´Î¶¼»áË¢ĞÂ²¢¸²¸Ç
-            2.0f,             // ÏÔÊ¾Ê±³¤£¨Ãë£©
-            FColor::Red,      // ÑÕÉ«
+            -1,               // Key: -1 è¡¨ç¤ºæ¯æ¬¡éƒ½ä¼šåˆ·æ–°å¹¶è¦†ç›–
+            2.0f,             // æ˜¾ç¤ºæ—¶é•¿ï¼ˆç§’ï¼‰
+            FColor::Red,      // é¢œè‰²
             TEXT("Projectile pool exhausted! Consider increasing pool size.")
         );
     }
@@ -852,7 +1041,7 @@ void AWeaponBase::InitializeProjectilePool()
             BulletClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
         if (Proj)
         {
-            Proj->DeactivateToPool();   // È·±£³õÊ¼Í£ÓÃ
+            Proj->DeactivateToPool();   // ç¡®ä¿åˆå§‹åœç”¨
             ProjectilePool.Add(Proj);
         }
     }
@@ -863,9 +1052,9 @@ float AWeaponBase::GetCurrentHipSpread() const
     float Spread = WeaponData->RecoilSpread.HipBaseSpread;
     if (bCompensatorEquipped) Spread *= WeaponData->RecoilSpread.CompensatorSpreadMultiplier;
     if (bSilencerEquipped) Spread *= WeaponData->RecoilSpread.SilencerSpreadMultiplier;
-    if (!bScopeEquipped) // ¼¤¹âÖ»ÔÚÑüÉäÊ±ÉúĞ§£¨¿ª¾µÊ±Í¨³£¹Ø±Õ£©
+    if (!bScopeEquipped) // æ¿€å…‰åªåœ¨è…°å°„æ—¶ç”Ÿæ•ˆï¼ˆå¼€é•œæ—¶é€šå¸¸å…³é—­ï¼‰
         Spread *= WeaponData->RecoilSpread.LaserHipSpreadMultiplier;
-    // Ãé×¼¾µ±¾Éí²»Ö±½ÓÓ°ÏìÑüÉä£¬¿ÉÒÔºöÂÔ
+    // ç„å‡†é•œæœ¬èº«ä¸ç›´æ¥å½±å“è…°å°„ï¼Œå¯ä»¥å¿½ç•¥
     return Spread;
 }
 
@@ -875,7 +1064,7 @@ float AWeaponBase::GetCurrentADSSpread() const
     if (bCompensatorEquipped) Spread *= WeaponData->RecoilSpread.CompensatorSpreadMultiplier;
     if (bSilencerEquipped) Spread *= WeaponData->RecoilSpread.SilencerSpreadMultiplier;
     if (bScopeEquipped) Spread *= WeaponData->RecoilSpread.ScopeADSSpreadMultiplier;
-    if (bScopeEquipped) Spread *= WeaponData->RecoilSpread.LaserADSSpreadMultiplier; // Ò»°ã¿ª¾µÊ±¼¤¹â¹Ø±Õ£¬µ«±£Áô³ËÊı
+    if (bScopeEquipped) Spread *= WeaponData->RecoilSpread.LaserADSSpreadMultiplier; // ä¸€èˆ¬å¼€é•œæ—¶æ¿€å…‰å…³é—­ï¼Œä½†ä¿ç•™ä¹˜æ•°
     return Spread;
 }
 
@@ -899,7 +1088,7 @@ void AWeaponBase::DisableWeaponPhysics()
 {
     if (VisualMesh)
     {
-        // ±ØĞëÏÈ¹ØÎïÀí£¬ÔÙ¸½¼Ó
+        // å¿…é¡»å…ˆå…³ç‰©ç†ï¼Œå†é™„åŠ 
         VisualMesh->SetSimulatePhysics(false);
         VisualMesh->SetEnableGravity(false);
         VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -919,18 +1108,18 @@ void AWeaponBase::EnableWeaponPhysics()
 	if (VisualMesh)
     {
         VisualMesh->SetVisibility(true);
-        VisualMesh->SetSimulatePhysics(true);      // ¿ªÆôÎïÀíÄ£Äâ£¨¿ÉÒÔºÍÆäËûÎïÌåÅö×²£©
+        VisualMesh->SetSimulatePhysics(true);      // å¼€å¯ç‰©ç†æ¨¡æ‹Ÿï¼ˆå¯ä»¥å’Œå…¶ä»–ç‰©ä½“ç¢°æ’ï¼‰
         VisualMesh->SetEnableGravity(true);     
         VisualMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
-        // »Ö¸´Åö×²ÏìÓ¦£¨Óë»ùÀà AInspectableItem µÄÄ¬ÈÏÉèÖÃÒ»ÖÂ£©
+        // æ¢å¤ç¢°æ’å“åº”ï¼ˆä¸åŸºç±» AInspectableItem çš„é»˜è®¤è®¾ç½®ä¸€è‡´ï¼‰
         VisualMesh->SetCollisionResponseToAllChannels(ECR_Block);
         VisualMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
         VisualMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
         VisualMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     }
 
-    // ÏÔÊ¾¼ìÊÓ¿Ø¼ş£¨µôÂäÎïĞèÒªÊ°È¡ÌáÊ¾£©
+    // æ˜¾ç¤ºæ£€è§†æ§ä»¶ï¼ˆæ‰è½ç‰©éœ€è¦æ‹¾å–æç¤ºï¼‰
     if (InteractionWidget)
     {
         InteractionWidget->SetVisibility(true);
