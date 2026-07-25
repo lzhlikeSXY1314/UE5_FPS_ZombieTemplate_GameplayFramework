@@ -19,6 +19,10 @@
 #include "Camera/PlayerCameraManager.h"
 
 #include "Kismet/KismetSystemLibrary.h" // 必须加这个头文件
+#include "InventorySystem/Components/InventoryHUDComponent.h"
+
+
+
 
 // Sets default values
 AZombiePlayer::AZombiePlayer()
@@ -54,8 +58,8 @@ AZombiePlayer::AZombiePlayer()
     ADSAudioComponent->bAutoActivate = false;
     ADSAudioComponent->SetVolumeMultiplier(1.0f);
 
-
-   
+    //库存组件
+    InventoryComponent = CreateDefaultSubobject<UInventoryHUDComponent>(TEXT("InventoryComponent"));
 
 }
 
@@ -154,6 +158,10 @@ void AZombiePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
         EnhancedInput->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AZombiePlayer::StartSprinting);
         EnhancedInput->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AZombiePlayer::StopSprinting);
+
+
+        //打开库存绑定
+        EnhancedInput->BindAction(IA_OpenInventory, ETriggerEvent::Triggered, this, &AZombiePlayer::OpenInventory);
     }
 }
 
@@ -703,3 +711,13 @@ void AZombiePlayer::StopCurrentCameraShake()
     }
     CurrentShakeState = 0;   // 重置状态，确保下次移动时重新创建
 }
+
+void AZombiePlayer::OpenInventory()
+{
+    if (InventoryComponent)
+    {
+        InventoryComponent->OpenInventory();
+    }
+}
+
+

@@ -15,7 +15,7 @@ class UInputMappingContext;
 class USpringArmComponent;
 class UCameraComponent;
 class UAnimMontage;
-
+class UInventoryHUDComponent;
 
 
 UENUM(BlueprintType)
@@ -303,5 +303,19 @@ private:
     
 #pragma endregion
 
+#pragma region Inventory
+public:
+    
+
+private:
+
+    UPROPERTY(VisibleAnywhere, Category = "Inventory")
+    UInventoryHUDComponent* InventoryComponent;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* IA_OpenInventory;
+
+    void OpenInventory();
+#pragma endregion
 
 };

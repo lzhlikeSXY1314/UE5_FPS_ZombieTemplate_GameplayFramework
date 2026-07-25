@@ -6,9 +6,6 @@
 #include "GameFramework/PlayerController.h"
 #include "ZombiePlayerController.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class ZOMBIETEMPLATE_API AZombiePlayerController : public APlayerController
 {

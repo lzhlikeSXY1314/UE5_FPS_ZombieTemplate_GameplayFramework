@@ -1,23 +1,25 @@
-# Unreal Engine folders to ignore
+# Unreal Engine 编译缓存目录（必须忽略，否则仓库爆炸）
 Binaries/
 DerivedDataCache/
 Intermediate/
 Saved/
+Build/
+
+# Visual Studio / VS Code 临时文件
 .vs/
-
-# Ignore all content except source code
-Content/**/*
-!Content/Blueprints/    # (optional) allow some blueprints if needed
-
-# Ignore user-specific settings
+.vscode/
 *.suo
 *.user
 *.userprefs
 *.sln
+*.sdf
 *.opensdf
 *.VC.db
 *.VC.opendb
 
-# Ignore config files that shouldn't be shared
+# vsconfig 是 VS 配置，如果你想共享就保留，不想共享就加一行：
+# .vsconfig
+
+# 忽略用户本地编辑器配置（保留共享配置）
 Config/DefaultEditor.ini
 Config/DefaultEditorPerProjectUserSettings.ini
