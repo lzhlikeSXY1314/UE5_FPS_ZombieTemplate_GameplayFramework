@@ -7,6 +7,7 @@
 #include "Interface/Interactable.h"
 #include "Components/WidgetComponent.h"  
 #include "SaveSystem/SaveableActor.h"
+#include "InventorySystem/Widgets/ItemWidget.h"
 #include "InspectableItem.generated.h"
 
 UCLASS()
@@ -42,6 +43,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
 	FVector MeshScale = FVector(1.0f);
 
+	// 3D 控件组件（例如显示物品名字、交互提示）
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UWidgetComponent* InteractionWidget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget Data")
+	FInventoryItemPayload InventoryItemPayload;
+
 
 //接口重写：
 	virtual FText GetItemName_Implementation() const override { return ItemName; }
@@ -49,9 +57,7 @@ public:
 	virtual int32 GetAmmoAmount_Implementation() const override { return 0; }
 //接口
 
-	// 3D 控件组件（例如显示物品名字、交互提示）
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UWidgetComponent* InteractionWidget;
+
 
 protected:
 	// Called when the game starts or when spawned

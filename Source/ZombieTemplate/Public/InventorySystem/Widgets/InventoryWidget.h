@@ -4,14 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include <InventorySystem/Components/InventoryHUDComponent.h>
 #include "InventoryWidget.generated.h"
 
 
 class UInventoryGridPanelWidget;
 class UTextBlock;
 class UImage;
-
+class UNameAndDecription;
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryWidget : public UUserWidget
@@ -37,12 +36,16 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UInventoryGridPanelWidget> WB_Temp;
 
+	// 绑定物品信息面板
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UNameAndDecription> WB_ItemInfo;
+
 	// 主背包标题文本
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> BaseSlotsText;
 
 	// 临时背包标题文本
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TempSlotsText;
 
 

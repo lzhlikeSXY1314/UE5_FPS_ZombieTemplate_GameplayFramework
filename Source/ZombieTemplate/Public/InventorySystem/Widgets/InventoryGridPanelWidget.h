@@ -28,8 +28,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly,meta = (BindWidget))
 	TObjectPtr<UOverlay> SlotsOverlay;
 
-	UPROPERTY(BlueprintReadOnly,meta = (BindWidget))
-	TObjectPtr<UGridPanel> Grid;
+
 
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory Grid")
 	TSubclassOf<UInventorySlotWidget> SlotWidgetClass;
@@ -48,4 +47,7 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory Grid")
 	TArray<UInventorySlotWidget*> SlotWidgets;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UGridPanel> Grid;
 };

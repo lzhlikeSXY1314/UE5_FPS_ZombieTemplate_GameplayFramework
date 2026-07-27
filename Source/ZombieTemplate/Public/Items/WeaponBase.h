@@ -24,7 +24,7 @@ public:
     void OnConstruction(const FTransform& Transform);
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
-
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     // ---------- 数据资产 ----------
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
     TObjectPtr<UWeaponData> WeaponData;
@@ -235,7 +235,7 @@ public:
     FVector GetCurrentMuzzleSmokeOffset() const;
     void FireWeaponVisuals(const FVector& MuzzleLocation, const FRotator& AimRotation, bool bIsAiming, USkeletalMeshComponent* HandsMesh);
     void ProcessHit(const FHitResult& Hit);
-
+    void ClearMuzzleSmokePool();
 private:
     float LastSmokeTime = 0.0f;
 
@@ -296,5 +296,6 @@ private:
     void RestoreBaseAttributes();
     void DisableWeaponPhysics();
     void EnableWeaponPhysics();
+  
 #pragma endregion
 };

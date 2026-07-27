@@ -2,7 +2,8 @@
 
 
 #include "Items/InspectableItem.h"
-
+#include "InventorySystem/Functions/InventoryStaticFunctions.h"
+#include <InventorySystem/Components/InventoryHUDComponent.h>
 
 FName AInspectableItem::GetUniqueSaveID_Implementation() const
 {
@@ -80,7 +81,13 @@ void AInspectableItem::OnConstruction(const FTransform& Transform)
 
 void AInspectableItem::OnInteract_Implementation(AActor* Interactor)
 {
-    Destroy();
+    UInventoryHUDComponent* InventoryHUD = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+    if (!InventoryHUD) return;
+    if (InventoryItemPayload.ItemAmount <= 0) return;
+    if(!InventoryHUD->CanAddItem(this,E_SlotsType::Primary,InventoryItemPayload.ItemAmount)) return;
+
+    InventoryHUD->AddItemToSlots(this, InventoryItemPayload.ItemAmount, E_SlotsType::Primary);
+    InventoryHUD->PlayInventorySound(E_InventorySoundType::PickupItem,false);
 }
 
 // Called when the game starts or when spawned

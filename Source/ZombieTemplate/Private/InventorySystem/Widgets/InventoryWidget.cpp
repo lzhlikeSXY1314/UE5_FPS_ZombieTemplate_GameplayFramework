@@ -5,7 +5,7 @@
 #include "Components/TextBlock.h"
 #include "InventorySystem/Widgets/InventoryGridPanelWidget.h"
 #include "InventorySystem/Functions/InventoryStaticFunctions.h"
-
+#include "InventorySystem/Components/InventoryHUDComponent.h"
 
 void UInventoryWidget::NativeConstruct()
 {

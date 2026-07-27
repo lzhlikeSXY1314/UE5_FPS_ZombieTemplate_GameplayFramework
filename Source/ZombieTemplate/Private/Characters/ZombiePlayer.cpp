@@ -24,6 +24,7 @@
 
 
 
+
 // Sets default values
 AZombiePlayer::AZombiePlayer()
 {
@@ -260,7 +261,7 @@ void AZombiePlayer::PerformFireTrace()
     ActorsToIgnore.Add(this);
     ActorsToIgnore.Add(CurrentWeapon);
 
-    // 👉 用 bool 控制是否显示调试射线
+    // 用 bool 控制是否显示调试射线
     EDrawDebugTrace::Type DebugType = bDrawShootTrace
         ? EDrawDebugTrace::ForDuration
         : EDrawDebugTrace::None;
@@ -292,6 +293,7 @@ void AZombiePlayer::PerformFireTrace()
             UDamageType::StaticClass()
         );
     }
+
 
     // ---------- 后坐力 ----------
     if (CurrentWeapon->WeaponData->RecoilSpread.bUseRecoil)
@@ -468,27 +470,28 @@ void AZombiePlayer::Interact()
 {
     UPlayerInteractionComponent* InteractionComp = FindComponentByClass<UPlayerInteractionComponent>();
     if (!InteractionComp) return;
+
     AActor* Target = InteractionComp->GetCurrentBestTarget();
     if (!Target) return;
 
-    // 如果目标是武器，处理武器切换  //先这样 后续库存系统
     if (AWeaponBase* NewWeapon = Cast<AWeaponBase>(Target))
     {
-        // 如果手里已有武器且不是同一把，先丢弃旧武器
-        if (CurrentWeapon && CurrentWeapon != NewWeapon)
+        // 调用接口，而不是直接 Equip
+        if (NewWeapon->Implements<UInteractable>())
         {
-            CurrentWeapon->Drop();
-            CurrentWeapon = nullptr;
+            PlayPickUpMontage();
+            IInteractable::Execute_OnInteract(NewWeapon, this);
         }
 
-        // 装备新武器
-        NewWeapon->Equip(this);
-        if (NewWeapon->IsEquipped())   // 检查是否装备成功
+        // 如果武器已经装备成功，更新 CurrentWeapon
+        if (NewWeapon->IsEquipped())
         {
+            if (CurrentWeapon && CurrentWeapon != NewWeapon)
+            {
+                CurrentWeapon->Drop();
+            }
             CurrentWeapon = NewWeapon;
             CurrentAnimState = EPlayerAnimState::CG_Handgun_AnimState;
-
-            PlayPickUpMontage();
         }
     }
     else
@@ -498,14 +501,11 @@ void AZombiePlayer::Interact()
         {
             PlayPickUpMontage();
             IInteractable::Execute_OnInteract(Target, this);
-
-            //其他也类似，先这样 看蓝图实现，比如补偿器，消音器
- 
         }
-
     }
 
     InteractionComp->ClearBestTarget();
+
 
 }
 

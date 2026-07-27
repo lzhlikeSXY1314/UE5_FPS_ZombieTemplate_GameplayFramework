@@ -4,10 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Datas/InventoryData.h"
 #include <InventorySystem/Structs/InventoryTypes.h>
 #include "InventoryStaticFunctions.generated.h"
 
-class UInventoryData;
+
 class USoundBase;
 class UInventoryHUDComponent;
 

@@ -13,6 +13,15 @@ class UInventorySlotWidget;
 class UMaterialInstance;
 
 
+UENUM(BlueprintType)
+enum class EItemBackgroundState : uint8
+{
+	Selected        UMETA(DisplayName = "Selected"),
+	NotSelected     UMETA(DisplayName = "Not Selected"),
+	Dragging        UMETA(DisplayName = "Dragging"),
+	Menu            UMETA(DisplayName = "Menu")
+};
+
 USTRUCT(BlueprintType)
 struct FInventoryGridConfig
 {
@@ -24,12 +33,12 @@ struct FInventoryGridConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid", meta = (ClampMin = "1", ClampMax = "10"))
 	int32 Rows = 5;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid", meta = (ClampMin = "20.0", ClampMax = "200.0"))
-	float SlotSize = 80.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory Grid")
 	TSubclassOf<UInventorySlotWidget> SlotWidgetClass;
 };
+
+
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryData : public UPrimaryDataAsset
@@ -46,7 +55,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Temp", meta = (EditCondition = "bEnableTempSlots", EditConditionHides))
 	FInventoryGridConfig TempConfig;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid", meta = (ClampMin = "20.0", ClampMax = "200.0"))
+	float SlotSize = 80.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Sounds")
 	TMap<E_InventorySoundType, USoundBase*> InventorySounds;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Item Materials")
+	TMap<EItemBackgroundState, UMaterialInstance*> ItemBackgroundMaterials;
 };
+
+

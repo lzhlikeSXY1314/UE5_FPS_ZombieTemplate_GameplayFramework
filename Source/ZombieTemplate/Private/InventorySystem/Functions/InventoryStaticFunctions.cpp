@@ -3,7 +3,7 @@
 
 #include "InventorySystem/Functions/InventoryStaticFunctions.h"
 #include"kismet/KismetMathLibrary.h"
-#include "Datas/InventoryData.h"
+
 #include <ZombieGameInstance.h>
 #include "InventorySystem/Components/InventoryHUDComponent.h"
 #include "GameFramework/Character.h"

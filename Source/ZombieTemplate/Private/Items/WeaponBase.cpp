@@ -93,7 +93,7 @@ AWeaponBase::AWeaponBase()
     FlashlightBeam->SetAttenuationRadius(50000.0f);
     FlashlightBeam->SetOuterConeAngle(25.0f);
 
-   
+    ClearMuzzleSmokePool();
 
 }
 
@@ -296,6 +296,7 @@ void AWeaponBase::OnConstruction(const FTransform& Transform)
 {
 
     Super::OnConstruction(Transform);
+
     
 }
 
@@ -305,7 +306,8 @@ void AWeaponBase::BeginPlay()
 	Super::BeginPlay();
     InitializeProjectilePool(); // 初始化对象池
     SaveBaseAttributes();
- 
+    ClearMuzzleSmokePool();
+
     // 动态创建烟雾粒子池（不能在 BeginPlay 中用 CreateDefaultSubobject）
     if (WeaponData && Weapon_SKMesh && MuzzleSmokePool.Num() == 0) // 防止重复创建
     {
@@ -331,6 +333,7 @@ void AWeaponBase::BeginPlay()
 
 void AWeaponBase::OnInteract_Implementation(AActor* Interactor)
 {
+    Super::OnInteract_Implementation(Interactor);
 	Equip(Interactor);
 
 }
@@ -1012,6 +1015,28 @@ void AWeaponBase::ProcessHit(const FHitResult& Hit)
     // 物理冲量等效果可后续添加
 }
 
+void AWeaponBase::ClearMuzzleSmokePool()
+{
+    for (UParticleSystemComponent* SmokeComp : MuzzleSmokePool)
+    {
+        if (SmokeComp)
+        {
+            // 1. 停止所有粒子效果
+            SmokeComp->Deactivate();
+            SmokeComp->OnSystemFinished.RemoveAll(this);  // 移除所有委托绑定
+
+            // 2. 从父组件分离
+            SmokeComp->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+
+            // 3. 从世界移除并销毁组件（推荐方式）
+            SmokeComp->DestroyComponent();
+        }
+    }
+
+    // 4. 清空数组
+    MuzzleSmokePool.Empty();
+}
+
 AProjectileBase* AWeaponBase::GetPooledProjectile()
 {
     for (AProjectileBase* Proj : ProjectilePool)
@@ -1131,4 +1156,8 @@ void AWeaponBase::EnableWeaponPhysics()
     }
 }
 
-
+void AWeaponBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+    ClearMuzzleSmokePool();
+}

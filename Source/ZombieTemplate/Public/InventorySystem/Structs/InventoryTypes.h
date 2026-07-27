@@ -56,3 +56,12 @@ enum class E_InventorySoundType : uint8
     SlotsSelectionWhileDraggingAnIncompatibleItem UMETA(DisplayName = "SlotsSelectionWhileDraggingAnIncompatibleItem"),
     UnableToPlaceDraggableItemInSlots UMETA(DisplayName = "UnableToPlaceDraggableItemInSlots")
 };
+
+
+UENUM(BlueprintType)
+enum class EItemRotation : uint8
+{
+    Horizontal = 0,
+    Vertical = 1
+};
+

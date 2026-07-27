@@ -15,7 +15,6 @@ void UInventoryGridPanelWidget::NativePreConstruct()
     }
 }
 
-
 void UInventoryGridPanelWidget::NativeConstruct()
 {
     if (!IsDesignTime())
@@ -72,7 +71,7 @@ void UInventoryGridPanelWidget::InitializeGrid()
         UInventorySlotWidget* NewSlot = CreateWidget<UInventorySlotWidget>(this, ActiveConfig->SlotWidgetClass);
         if (!NewSlot) continue;
 
-        NewSlot->SetSlotSize(ActiveConfig->SlotSize);
+        NewSlot->SetSlotSize(InventoryOptions->SlotSize);
         NewSlot->Index = i;
         NewSlot->SlotsType = SlotsType;
 
