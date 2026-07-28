@@ -53,9 +53,6 @@ void UInventoryWidget::SetText(const FText& BaseSlots, const FText& TempSlots)
     }
 }
 
-
-
-
 void UInventoryWidget::CloseInventory()
 {
     SetVisibility(ESlateVisibility::Collapsed);

@@ -21,6 +21,8 @@ class ZOMBIETEMPLATE_API UInventorySlotWidget : public UUserWidget
 protected:
     virtual void NativePreConstruct() override;
     virtual void NativeOnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+    virtual void NativeOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& PointerEvent, UDragDropOperation*& OutDragDropOperation) override;
 
 public:
 
@@ -50,7 +52,6 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot Data", meta = (ExposeOnSpawn = true))
     E_SlotsType SlotsType;
-
 
 
 private:

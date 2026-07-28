@@ -11,18 +11,33 @@
 #include "InventorySystem/Functions/InventoryStaticFunctions.h" 
 #include "Components/GridSlot.h"
 #include "InventorySystem/Widgets/NameAndDecription.h"
-
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include <Blueprint/WidgetLayoutLibrary.h>
+#include <Blueprint/SlateBlueprintLibrary.h>
 
 void UInventoryHUDComponent::BeginPlay()
 {
+    Super::BeginPlay();
+
     InitializeSlots();
+
+    OnDragDetected.AddDynamic(this, &ThisClass::HandleDragDetected);
+}
+
+void UInventoryHUDComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    if (!DragWidget) return;
+    SnapDraggedItemToGridSlot(DeltaTime);
 }
 
 // Sets default values for this component's properties
 UInventoryHUDComponent::UInventoryHUDComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
-
+	PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bStartWithTickEnabled = true;
+    PrimaryComponentTick.bTickEvenWhenPaused = true;
 
 }
 
@@ -30,10 +45,7 @@ void UInventoryHUDComponent::OpenInventory()
 {
     if (!InventoryWidgetClass) return;
 
-    ACharacter* Char = Cast<ACharacter>(GetOwner());
-    if (!Char) return;
-
-    APlayerController* PC = Cast<APlayerController>(Char->GetController());
+    APlayerController* PC = GetPlayerController();
     if (!PC) return;
 
     if (!InventoryWidget)
@@ -57,17 +69,20 @@ void UInventoryHUDComponent::OpenInventory()
         PC->bShowMouseCursor = true;
         PC->SetPause(true);
         SetNameAndDescriptionText(FText::GetEmpty(), FText::GetEmpty());
-
+        DeselectAllSlots();
         LoadItemWidgets();
     }
 
-    int32 ViewportX, ViewportY;
-    PC->GetViewportSize(ViewportX, ViewportY);
-
-    int32 CenterX = ViewportX / 2;
-    int32 CenterY = ViewportY / 2;
-
-    PC->SetMouseLocation(CenterX, CenterY);
+    // 将设置鼠标位置延迟到下一帧
+    GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
+        {
+            if (APlayerController* PC = GetPlayerController())
+            {
+                int32 ViewportX, ViewportY;
+                PC->GetViewportSize(ViewportX, ViewportY);
+                PC->SetMouseLocation(ViewportX / 2, ViewportY / 2);
+            }
+        });
 
 }
 
@@ -79,10 +94,23 @@ void UInventoryHUDComponent::CloseInventory()
 
 void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound)
 {
+    int32 L_SelectSlotIndex = FMath::Max(InIndex, 0);
     
-    const int32 L_SelectSlotIndex = FMath::Max(InIndex, 0);
+    if (DragWidget) InShouldPlaySound &= (L_SelectSlotIndex != SelectSlotIndex || SelectSlotType != InSlotType);
+
     SelectSlotType = InSlotType;
+
+    ApplyOffset(L_SelectSlotIndex); // 查空间，跟随拾取起点
+
     SelectSlotIndex = FMath::Max(L_SelectSlotIndex, 0);
+
+
+    if (DragWidget)
+    {
+        InShouldPlaySound ? PlayInventorySound(E_InventorySoundType::SelectSlotWhenItemDragged) : PlayInventorySound(E_InventorySoundType::None);
+        return;
+    }
+
 
     for (UInventorySlotWidget* L_Slot : GetSlotsByType(SelectSlotType))
     {
@@ -144,10 +172,6 @@ void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, b
             L_Slot->SelectSlot(false);
         }
     }
-
-
-
-
 }
 
 void UInventoryHUDComponent::DeselectAllItemWidget()
@@ -156,6 +180,21 @@ void UInventoryHUDComponent::DeselectAllItemWidget()
     {
         if (!ItemWidget) continue;
         ItemWidget->SelectItemBackgroundMaterial(false,false);
+    }
+}
+
+void UInventoryHUDComponent::DeselectAllSlots()
+{
+    for (UInventorySlotWidget* Slot : GetSlotsByType(E_SlotsType::Primary))
+    {
+        if (!Slot) continue;
+        Slot->SelectSlot(false);
+    }
+
+    for (UInventorySlotWidget* Slot : GetSlotsByType(E_SlotsType::Temp))
+    {
+        if (!Slot) continue;
+        Slot->SelectSlot(false);
     }
 }
 
@@ -185,6 +224,20 @@ void UInventoryHUDComponent::PlayInventorySound(E_InventorySoundType SoundType, 
     }
 
 
+}
+
+
+APlayerController* UInventoryHUDComponent::GetPlayerController()
+{
+    if (ACharacter* Char = GetOwner<ACharacter>())
+    {
+        if (APlayerController* PC = Cast<APlayerController>(Char->GetController()))
+        {
+            return PC;
+        }
+    }
+    
+    return nullptr;
 }
 
 TArray<UInventorySlotWidget*> UInventoryHUDComponent::GetSlotsByType(E_SlotsType SlotsType) const
@@ -221,6 +274,12 @@ UGridPanel* UInventoryHUDComponent::GetGribInventoryWidget(const E_SlotsType Slo
         ? InventoryWidget->WB_Primary->Grid
         : InventoryWidget->WB_Temp->Grid;
 
+}
+
+void UInventoryHUDComponent::SetRealSelectedSlot(int32 InIndex, E_SlotsType InSlotType)
+{
+    RealSelectedSlot.Index = InIndex;
+    RealSelectedSlot.Type = InSlotType;
 }
 
 void UInventoryHUDComponent::InitializeSlots()
@@ -544,52 +603,6 @@ void UInventoryHUDComponent::SetItemAmount(AInspectableItem* Item, const int32 A
     }
 }
 
-void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, const bool CanDestory, const bool IsEquipped)
-{
-    if (!ItemWidgetClass || !IsValid(Item)) return;
-    if (Item->InventoryItemPayload.OccupiedSlots.Num() == 0) return;
-
-    UInventoryData* InvData = UInventoryStaticFunctions::GetInventoryOptions(this);
-    if (!InvData) return;
-
-    const int32 Width = InvData->PrimaryConfig.Columns;
-    const int32 FirstSlot = Item->InventoryItemPayload.OccupiedSlots[0];
-
-    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
-    if (!OwnerCharacter) return;
-
-    APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController());
-    if (!PC) return;
-
-    UItemWidget* NewItemWidget = CreateWidget<UItemWidget>(PC, ItemWidgetClass);
-    if (!NewItemWidget) return;
-
-    NewItemWidget->InventoryItemPayload = Item->InventoryItemPayload;
-    NewItemWidget->InventoryItemPayload.InventoryComponentReference = this;
-    NewItemWidget->InventoryItemPayload.IsEquipped = IsEquipped;
-    NewItemWidget->DefaultRotation = Item->InventoryItemPayload.Rotation;
-    NewItemWidget->SetItemWidgetAspectRatio();
-
-    ItemsWidgets.Add(NewItemWidget);
-
-    UGridPanel* Grid = GetGribInventoryWidget(Item->InventoryItemPayload.SlotsType);
-    if (!Grid) return;
-
-    const int32 Col = UInventoryStaticFunctions::GetColumn(FirstSlot, Width);
-    const int32 Row = UInventoryStaticFunctions::GetRow(FirstSlot, Width);
-
-    UGridSlot* GridSlot = Grid->AddChildToGrid(NewItemWidget, Row, Col);
-    if (!GridSlot) return;
-
-    GridSlot->SetLayer(2);
-
-    const bool bIsVertical = (Item->InventoryItemPayload.Rotation == EItemRotation::Vertical);
-    const int32 RowSpan = bIsVertical ? Item->InventoryItemPayload.ItemIconSize.X : Item->InventoryItemPayload.ItemIconSize.Y;
-    const int32 ColSpan = bIsVertical ? Item->InventoryItemPayload.ItemIconSize.Y : Item->InventoryItemPayload.ItemIconSize.X;
-
-    GridSlot->SetRowSpan(RowSpan);
-    GridSlot->SetColumnSpan(ColSpan);
-}
 
 void UInventoryHUDComponent::ClearSlots(const E_SlotsType SlotsType, const TArray<int32>& Slots)
 {
@@ -683,6 +696,379 @@ void UInventoryHUDComponent::LoadItemWidgets()
         AddItemWidgetToGrib(Slot.ItemReference,false,false);
     }
 }
+
+int32 UInventoryHUDComponent::GetRowBySlotType(int32 InIndex, E_SlotsType InSlotType)
+{
+    if (InIndex < 0) return -1;
+    if(!UInventoryStaticFunctions::GetInventoryOptions(this))  return -1;
+    int32 Col = InSlotType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
+    return UInventoryStaticFunctions::GetRow(InIndex, Col);
+}
+
+int32 UInventoryHUDComponent::GetColumnBySlotType(int32 InIndex, E_SlotsType InSlotType)
+{
+    if (InIndex < 0) return -1;
+    if (!UInventoryStaticFunctions::GetInventoryOptions(this))  return -1;
+    int32 Col = InSlotType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
+    return UInventoryStaticFunctions::GetColumn(InIndex,Col);
+}
+
+UInventorySlotWidget* UInventoryHUDComponent::GetSlotWidgetByIndex(int32 InIndex, E_SlotsType InSlotType)
+{
+    TArray<UInventorySlotWidget*> Slots = GetSlotsByType(InSlotType);
+    for (UInventorySlotWidget* Slot : Slots)
+    {
+        if (Slot && Slot->Index == InIndex)
+            return Slot;
+    }
+    return nullptr;
+}
+
+
+void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, const bool CanDestory, const bool IsEquipped)
+{
+    if (!ItemWidgetClass || !IsValid(Item)) return;
+    if (Item->InventoryItemPayload.OccupiedSlots.Num() == 0) return;
+
+    UInventoryData* InvData = UInventoryStaticFunctions::GetInventoryOptions(this);
+    if (!InvData) return;
+
+    const int32 Width = InvData->PrimaryConfig.Columns;
+    const int32 FirstSlot = Item->InventoryItemPayload.OccupiedSlots[0];
+
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+
+    UItemWidget* NewItemWidget = CreateWidget<UItemWidget>(PC, ItemWidgetClass);
+    if (!NewItemWidget) return;
+
+    NewItemWidget->InventoryItemPayload = Item->InventoryItemPayload;
+    NewItemWidget->InventoryItemPayload.InventoryComponentReference = this;
+    NewItemWidget->InventoryItemPayload.IsEquipped = IsEquipped;
+    NewItemWidget->DefaultRotation = Item->InventoryItemPayload.Rotation;
+    NewItemWidget->Rotation = Item->InventoryItemPayload.Rotation;
+    NewItemWidget->SetItemWidgetAspectRatio();
+
+    ItemsWidgets.Add(NewItemWidget);
+
+    UGridPanel* Grid = GetGribInventoryWidget(Item->InventoryItemPayload.SlotsType);
+    if (!Grid) return;
+
+    const int32 Col = UInventoryStaticFunctions::GetColumn(FirstSlot, Width);
+    const int32 Row = UInventoryStaticFunctions::GetRow(FirstSlot, Width);
+
+    UGridSlot* GridSlot = Grid->AddChildToGrid(NewItemWidget, Row, Col);
+    if (!GridSlot) return;
+
+    GridSlot->SetLayer(2);
+
+    const bool bIsVertical = (Item->InventoryItemPayload.Rotation == EItemRotation::Vertical);
+    const int32 RowSpan = bIsVertical ? Item->InventoryItemPayload.ItemIconSize.X : Item->InventoryItemPayload.ItemIconSize.Y;
+    const int32 ColSpan = bIsVertical ? Item->InventoryItemPayload.ItemIconSize.Y : Item->InventoryItemPayload.ItemIconSize.X;
+
+    GridSlot->SetRowSpan(RowSpan);
+    GridSlot->SetColumnSpan(ColSpan);
+}
+
+/// <DragWidget>
+void UInventoryHUDComponent::InitializeDragWidget()
+{
+    FSlotInfo SlotInfo = GetRealSelectedSlot();
+    UItemWidget* ItemWidget = GetItemWidgetByIndex(SlotInfo.Index, SlotInfo.Type);
+    if (!ItemWidget) return;
+    EndBackItemWidgetToSlots();
+    HidedItemWidgetWhenDragActive = ItemWidget;
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+
+    FVector2D MousePos = FVector2D::ZeroVector;
+    PC->GetMousePosition(MousePos.X, MousePos.Y);
+    const FVector2D WidgetViewportPos = ItemWidget->GetCachedGeometry().GetAbsolutePosition();
+    Offset = MousePos - WidgetViewportPos;
+
+    if (DragWidget)
+    {
+        DragWidget->RemoveFromParent();
+        DragWidget = nullptr;
+    }
+    DeselectAllItemWidget();
+    HidedItemWidgetWhenDragActive->SetVisibility(ESlateVisibility::Collapsed);
+
+    int32 FirstOccupiedSlotIndex = HidedItemWidgetWhenDragActive->GetFirstOccupiedSlotIndex();
+    E_SlotsType SlotType = HidedItemWidgetWhenDragActive->InventoryItemPayload.SlotsType;
+    if (GetSlots(SlotType).IsValidIndex(FirstOccupiedSlotIndex))
+    {
+        AInspectableItem* ItemRef = GetSlots(SlotType)[FirstOccupiedSlotIndex].ItemReference;
+        if (!ItemRef) return;
+        UItemWidget* NewItemWidget = CreateWidget<UItemWidget>(PC, ItemWidgetClass);
+        if (!NewItemWidget) return;
+        NewItemWidget->InventoryItemPayload = ItemWidget->InventoryItemPayload;
+        NewItemWidget->DefaultRotation = ItemWidget->InventoryItemPayload.Rotation;
+      
+        //获取从被点击的单元格到槽位项第一个单元格的偏移量
+        int32 RealSelectedIndex = SlotInfo.Index;
+        int32 Offsetcol = GetColumnBySlotType(RealSelectedIndex, SlotType) - GetColumnBySlotType(FirstOccupiedSlotIndex, SlotType);
+        int32 OffsetRow = GetRowBySlotType(RealSelectedIndex, SlotType) - GetRowBySlotType(FirstOccupiedSlotIndex, SlotType);
+        NewItemWidget->Offset = FVector2D(Offsetcol, OffsetRow);
+
+        NewItemWidget->SetItemWidgetAspectRatio();
+        if (InventoryWidget && InventoryWidget->CanvasPanel_Root)
+        {
+            UCanvasPanelSlot* CanvasPanelSlot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(NewItemWidget);
+            CanvasPanelSlot->SetAutoSize(true);
+
+            UInventorySlotWidget* Slot = GetSlotWidgetByIndex(FirstOccupiedSlotIndex, SlotInfo.Type); //很奇怪用数组寻求的值会出错
+            if (!Slot) return;
+
+           FGeometry CachedGeometry = Slot->GetCachedGeometry();
+           FVector2D ViewportPos;
+           FVector2D PixelPosition;
+
+        
+            USlateBlueprintLibrary::LocalToViewport(
+               this,
+               CachedGeometry,
+               FVector2D::ZeroVector,
+               PixelPosition,
+               ViewportPos
+            );
+            UWidgetLayoutLibrary::SlotAsCanvasSlot(NewItemWidget)->SetPosition(ViewportPos);
+
+
+            NewItemWidget->SetActiveBackgroundMaterial(true);
+            DragWidget = NewItemWidget;
+        }
+
+    }
+
+}
+
+void UInventoryHUDComponent::SnapDraggedItemToGridSlot(float InDeltaTime)
+{
+    if (!DragWidget) return;
+    UInventorySlotWidget* Slot = GetSlotWidgetByIndex(SelectSlotIndex, SelectSlotType);
+    if (!Slot) return;
+    UCanvasPanelSlot* DragWidgetSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(DragWidget);
+    if (!DragWidgetSlot) return;
+
+    FGeometry CachedGeometry = Slot->GetCachedGeometry();
+    FVector2D ViewportPos;
+    FVector2D PixelPosition;
+    USlateBlueprintLibrary::LocalToViewport(
+        this,
+        CachedGeometry,
+        FVector2D::ZeroVector,
+        PixelPosition,
+        ViewportPos
+    );
+    FVector2D CurrentPos = DragWidgetSlot->GetPosition();
+    float InterpSpeed = 22.0f;
+    FVector2D NewPos = FMath::Vector2DInterpTo(CurrentPos, ViewportPos, InDeltaTime, InterpSpeed);
+
+    DragWidgetSlot->SetPosition(NewPos);
+}
+
+void UInventoryHUDComponent::ApplyOffset(int32& InIndex)
+{
+    if (!DragWidget) return;
+
+    E_SlotsType L_SlotsType = GetRealSelectedSlot().Type;
+    FVector2D L_Offset = DragWidget->Offset;
+
+    if(!UInventoryStaticFunctions::GetInventoryOptions(this)) return;
+
+    const int32 Col = L_SlotsType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
+    const int32 Row = L_SlotsType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Rows : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Rows;
+
+    const int32 ItemSizeCol = DragWidget->InventoryItemPayload.ItemIconSize.X;
+    const int32 ItemSizeRow = DragWidget->InventoryItemPayload.ItemIconSize.Y;
+
+    bool IsRotated = DragWidget->InventoryItemPayload.Rotation != DragWidget->DefaultRotation;
+    bool DefaultIsVertical = DragWidget->DefaultRotation == EItemRotation::Vertical;
+    bool IsLongVertical = DragWidget->InventoryItemPayload.IsLongVertical;
+
+    InIndex = CalculateItemIndex(InIndex, L_Offset, Col, Row, ItemSizeRow, ItemSizeCol, IsRotated, DefaultIsVertical, IsLongVertical);
+
+}
+
+int32 UInventoryHUDComponent::CalculateItemIndex(int32 ClickIndex, FVector2D InOffset, int32 InventoryCols, int32 InventoryRows, int32 ItemRows, int32 ItemCols, bool bIsRotated, bool DefaultIsVertical, bool IsLongVerticalItem)
+{
+    // 防御性检查：避免除零错误（库存行列数至少为1）
+    if (InventoryCols <= 0 || InventoryRows <= 0)
+    {
+        return 0;
+    }
+
+    int32 DefaultItemCol = 0;
+    int32 DefaultItemRow = 0;
+    int32 RelativeRow = 0;
+    int32 RelativeCol = 0;
+
+    //根据IsLongVerticalItem是否为垂直长物进行旋转
+    if (IsLongVerticalItem)
+    {
+
+
+        if (DefaultIsVertical)
+        {
+            if (ItemCols < ItemRows)
+            {
+                DefaultItemCol = ItemRows;
+                DefaultItemRow = ItemCols;
+            }
+            else
+            {
+                DefaultItemCol = ItemCols;
+                DefaultItemRow = ItemRows;
+            }
+
+            RelativeCol = bIsRotated ? InOffset.Y : InOffset.X; // 点击点相对物品左上角的行偏移
+            RelativeRow = bIsRotated ? DefaultItemCol - InOffset.X - 1 : InOffset.Y; // 点击点相对物品左上角的列偏移
+
+        }
+        else
+        {
+            //下面是正常的：
+            DefaultItemCol = ItemCols;
+            DefaultItemRow = ItemRows;
+
+            RelativeRow = bIsRotated ? InOffset.X : InOffset.Y; // 点击点相对物品左上角的行偏移
+            RelativeCol = bIsRotated ? ItemRows - InOffset.Y - 1 : InOffset.X; // 点击点相对物品左上角的列偏移
+
+
+
+        }
+
+
+
+    }
+    else
+    {
+
+        if (DefaultIsVertical)
+        {
+            if (ItemCols > ItemRows)
+            {
+                DefaultItemCol = ItemRows;
+                DefaultItemRow = ItemCols;
+            }
+            else
+            {
+                DefaultItemCol = ItemCols;
+                DefaultItemRow = ItemRows;
+            }
+
+            RelativeCol = bIsRotated ? InOffset.Y : InOffset.X; // 点击点相对物品左上角的行偏移
+            RelativeRow = bIsRotated ? DefaultItemCol - InOffset.X - 1 : InOffset.Y; // 点击点相对物品左上角的列偏移
+
+        }
+        else
+        {
+            DefaultItemCol = ItemCols;
+            DefaultItemRow = ItemRows;
+
+            RelativeRow = bIsRotated ? InOffset.X : InOffset.Y; // 点击点相对物品左上角的行偏移
+            RelativeCol = bIsRotated ? ItemRows - InOffset.Y - 1 : InOffset.X; // 点击点相对物品左上角的列偏移
+        }
+
+    }
+
+    // 1. 处理旋转：交换物品的行列偏移和实际尺寸
+
+    const int32 ItemWidth = bIsRotated ? DefaultItemRow : DefaultItemCol;   // 物品实际宽度（列数）
+    const int32 ItemHeight = bIsRotated ? DefaultItemCol : DefaultItemRow;  // 物品实际高度（行数）
+
+    // 2. 提取点击点的行和列（基础坐标）
+    const int32 ClickRow = ClickIndex / InventoryCols;    // 点击点所在行
+    const int32 ClickCol = ClickIndex % InventoryCols;    // 点击点所在列
+
+    // 3. 计算初始左上角索引（基于点击点和相对偏移）
+    // 3.1 计算点击点上方、相对行范围内的总格子数（用于行内位置校准）
+    const int32 CellsAboveRelativeRow = RelativeRow * InventoryCols;
+    // 3.2 计算点击点在当前行内的列位置（考虑相对行上方的偏移）
+    int32 LocalColInRow = ClickIndex - CellsAboveRelativeRow;
+
+    // 3.3 处理列位置为负数的情况（点击点在相对行上方时校准）
+    if (LocalColInRow < 0)
+    {
+        // 校准公式：补充相对行与点击行的差值对应的列偏移
+        LocalColInRow += (RelativeRow - ClickRow) * InventoryCols;
+    }
+
+    // 3.4 初始左上角索引 = 行内列位置 - 相对列偏移
+    int32 ItemTopLeftIndex = LocalColInRow - RelativeCol;
+
+    // 4. 处理左边界越界：点击列 <= 相对列时，强制左上角列对齐当前行的左边界
+    if (ClickCol <= RelativeCol)
+    {
+        // 左上角行 = 点击行 - 相对行（确保至少在第0行）
+        const int32 AdjustedTopRow = FMath::Max(ClickRow - RelativeRow, 0);
+        ItemTopLeftIndex = AdjustedTopRow * InventoryCols; // 列强制为0（当前行第一列）
+    }
+
+    // 5. 转换左上角索引为行和列，准备处理下/右边界
+    int32 TopRow = ItemTopLeftIndex / InventoryCols;
+    int32 TopCol = ItemTopLeftIndex % InventoryCols;
+
+    // 6. 计算库存边界上限
+    const int32 MaxRow = InventoryRows - 1;       // 最大行索引（0-based）
+    const int32 MaxCol = InventoryCols - 1;       // 最大列索引（0-based）
+    const int32 MaxValidTopRow = FMath::Max(0, MaxRow - ItemHeight + 1); // 允许的最大左上角行（确保物品不超出下边界）
+    const int32 MaxValidTopCol = FMath::Max(0, MaxCol - ItemWidth + 1);  // 允许的最大左上角列（确保物品不超出右边界）
+
+    // 7. 处理下边界和上边界：直接 clamping 到合法范围（替代单独的if判断）
+    TopRow = FMath::Clamp(TopRow, 0, MaxValidTopRow);
+
+    // 8. 处理右边界和左边界：直接 clamping 到合法范围
+    TopCol = FMath::Clamp(TopCol, 0, MaxValidTopCol);
+
+    // 9. 计算最终的左上角索引
+    return TopRow * InventoryCols + TopCol;
+}
+
+void UInventoryHUDComponent::EndBackItemWidgetToSlots()
+{
+    if (!IsValid(HidedItemWidgetWhenDragActive)) return;
+    int32 FirstOccupiedSlotIndex = HidedItemWidgetWhenDragActive->GetFirstOccupiedSlotIndex();
+    E_SlotsType SlotType = HidedItemWidgetWhenDragActive->InventoryItemPayload.SlotsType;
+
+    if (GetSlots(SlotType).IsValidIndex(FirstOccupiedSlotIndex))
+    {
+        AInspectableItem* ItemRef = GetSlots(SlotType)[FirstOccupiedSlotIndex].ItemReference;
+        if (ItemRef)
+        {
+            HidedItemWidgetWhenDragActive->SetVisibility(ESlateVisibility::HitTestInvisible);
+        }
+        else
+        {
+            HidedItemWidgetWhenDragActive->RemoveFromParent();
+        }
+        HidedItemWidgetWhenDragActive = nullptr;
+
+        return;
+    }
+
+}
+
+void UInventoryHUDComponent::HandleDragDetected()
+{
+    if (IsValid(DragWidget))
+    {
+        //Drag End
+        return;
+    }
+
+    PlayInventorySound(E_InventorySoundType::OnDragStart,true);
+    InitializeDragWidget();
+    DeselectAllSlots();
+    SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+
+}
+
+
+
+
+/// </DragWidget>
 
 
 

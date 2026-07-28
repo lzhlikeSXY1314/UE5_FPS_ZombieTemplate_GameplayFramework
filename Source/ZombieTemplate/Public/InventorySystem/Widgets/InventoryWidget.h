@@ -11,6 +11,7 @@ class UInventoryGridPanelWidget;
 class UTextBlock;
 class UImage;
 class UNameAndDecription;
+class UCanvasPanel;
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryWidget : public UUserWidget
@@ -27,6 +28,8 @@ protected:
 
 public:
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCanvasPanel> CanvasPanel_Root;
 
 	// 主背包网格
 	UPROPERTY(meta = (BindWidget))
@@ -47,6 +50,7 @@ public:
 	// 临时背包标题文本
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TempSlotsText;
+
 
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")

@@ -29,6 +29,7 @@
 AZombiePlayer::AZombiePlayer()
 {
 
+
     // Create and attach Camera
     FPS_Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("FPS_Camera"));
     FPS_Camera->SetupAttachment(RootComponent); //修改GetMesh()
@@ -51,6 +52,7 @@ AZombiePlayer::AZombiePlayer()
     bUseControllerRotationYaw = true;
     GetCharacterMovement()->bOrientRotationToMovement = false;
 
+
     FOVTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("FOVTimeline"));
     FOVTimelineCallback.BindUFunction(this, FName("UpdateFOV"));
 
@@ -68,50 +70,47 @@ AZombiePlayer::AZombiePlayer()
 void AZombiePlayer::BeginPlay()
 {
 	Super::BeginPlay();
-	
-    if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
-    {
-         MovementComp->MaxWalkSpeed = NormalWalkSpeed;
-    }
-
-    if (APlayerController* PC = Cast<APlayerController>(Controller))
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
-        {
-            if (DefaultMappingContext)
+            if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
             {
-                Subsystem->AddMappingContext(DefaultMappingContext, 0);
+                MovementComp->MaxWalkSpeed = NormalWalkSpeed;
             }
-        }
-    }
 
-    // 只有本地控制的角色才显示准星（多人游戏或 AI 不显示）
-    if (IsLocallyControlled() && CrosshairWidgetClass)
-    {
-        CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
-        if (CrosshairWidget)
-        {
-            CrosshairWidget->AddToViewport();
-        }
-    }
+            if (APlayerController* PC = Cast<APlayerController>(Controller))
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+                    ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+                {
+                    if (DefaultMappingContext)
+                    {
+                        Subsystem->AddMappingContext(DefaultMappingContext, 0);
+                    }
+                }
+            }
 
-    // 设置 FOV 时间轴曲线（如果已经指定）
-    if (FOVCurve)
-    {
-        FOVTimeline->AddInterpFloat(FOVCurve, FOVTimelineCallback);
-        // 设置时间轴长度与曲线的最后一帧一致（通常曲线最后一帧的时间即为总时长）
-        float MinTime, MaxTime;
-        FOVCurve->GetTimeRange(MinTime, MaxTime);
-        FOVTimeline->SetTimelineLength(MaxTime);
-    }
+            // 只有本地控制的角色才显示准星（多人游戏或 AI 不显示）
+            if (IsLocallyControlled() && CrosshairWidgetClass)
+            {
+                CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
+                if (CrosshairWidget)
+                {
+                    CrosshairWidget->AddToViewport();
+                }
+            }
 
-    if (FPSSkeletalMesh)
-    {
-        DefaultArmsRelativeLocation = FPSSkeletalMesh->GetRelativeLocation();
-    }
+            // 设置 FOV 时间轴曲线（如果已经指定）
+            if (FOVCurve)
+            {
+                FOVTimeline->AddInterpFloat(FOVCurve, FOVTimelineCallback);
+                // 设置时间轴长度与曲线的最后一帧一致（通常曲线最后一帧的时间即为总时长）
+                float MinTime, MaxTime;
+                FOVCurve->GetTimeRange(MinTime, MaxTime);
+                FOVTimeline->SetTimelineLength(MaxTime);
+            }
 
-
+            if (FPSSkeletalMesh)
+            {
+                DefaultArmsRelativeLocation = FPSSkeletalMesh->GetRelativeLocation();
+            }
 
 }
 

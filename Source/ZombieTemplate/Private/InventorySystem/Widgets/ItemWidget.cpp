@@ -114,6 +114,21 @@ void UItemWidget::SetAmount()
     Amount_Text->SetText(FText::AsNumber(InventoryItemPayload.ItemAmount));
 }
 
+void UItemWidget::SetActiveBackgroundMaterial(bool InActive)
+{
+    Background->SetBrushFromMaterial(
+        InActive
+        ? UInventoryStaticFunctions::GetInventoryOptions(this)->ItemBackgroundMaterials[EItemBackgroundState::Dragging]
+        : UInventoryStaticFunctions::GetInventoryOptions(this)->ItemBackgroundMaterials[EItemBackgroundState::NotSelected]
+    );
+}
+
+int32 UItemWidget::GetFirstOccupiedSlotIndex()
+{
+    if(InventoryItemPayload.OccupiedSlots.IsValidIndex(0)) return InventoryItemPayload.OccupiedSlots[0];
+    return -1;
+}
+
 void UItemWidget::SetItemWidgetAspectRatio()
 {
     if (!SizeBox_Root) return;

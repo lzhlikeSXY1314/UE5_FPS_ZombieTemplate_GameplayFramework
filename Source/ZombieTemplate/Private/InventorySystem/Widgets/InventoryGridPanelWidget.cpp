@@ -32,7 +32,7 @@ void UInventoryGridPanelWidget::InitializeGrid()
 {
     if (!Grid || !InventoryOptions) return;
     Grid->ClearChildren();
-
+    SlotWidgets.Empty();
     const FInventoryGridConfig* ActiveConfig = nullptr;
     switch (SlotsType)
     {

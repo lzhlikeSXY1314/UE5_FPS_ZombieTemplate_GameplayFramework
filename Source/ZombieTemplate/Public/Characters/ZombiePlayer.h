@@ -57,6 +57,8 @@ protected:
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+    bool InitializeFinish = false;
+
 #pragma region UI
 private:
     UPROPERTY(EditDefaultsOnly, Category = "UI")

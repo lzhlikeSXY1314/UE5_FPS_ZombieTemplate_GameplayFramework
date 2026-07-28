@@ -10,6 +10,9 @@
 #include <Components/GridPanel.h>
 #include "InventoryHUDComponent.generated.h"
 
+//ÉùÃ÷Î¯ÍÐ
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryDragDetected); //ÍÏ×§
+
 
 #pragma region Structs
 USTRUCT(BlueprintType)
@@ -37,6 +40,18 @@ struct FSlotStruct
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FSlotInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	int32 Index = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	E_SlotsType Type = E_SlotsType::Primary;
+};
+
 #pragma endregion
 
 class UInventoryWidget;
@@ -50,6 +65,8 @@ class ZOMBIETEMPLATE_API UInventoryHUDComponent : public UActorComponent
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 
 public:	
 	// Sets default values for this component's properties
@@ -91,6 +108,7 @@ public:
 	void SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound);
 
 	void DeselectAllItemWidget();
+	void DeselectAllSlots();
 	void SetNameAndDescriptionText(const FText ItemName, const FText ItemDesc);
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Sound")
@@ -99,7 +117,27 @@ public:
 	UFUNCTION(Category = "Inventory|Sound")
 	void PlayInventorySound(E_InventorySoundType SoundType, bool bUnstoppable = false);
 
+	UFUNCTION()
+	void SetRealSelectedSlot(int32 InIndex, E_SlotsType InSlotType);
+#pragma region Delegate
+public:
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Drag")
+	FOnInventoryDragDetected OnDragDetected;
+
+
+
 private:
+	UFUNCTION()
+	void HandleDragDetected();
+
+#pragma endregion
+
+
+
+private:
+	UFUNCTION()
+	APlayerController* GetPlayerController();
+
 	UFUNCTION(Category = "Inventory|Slots")
 	TArray<UInventorySlotWidget*> GetSlotsByType(E_SlotsType SlotsType) const;
 
@@ -115,8 +153,16 @@ private:
 	UPROPERTY()
 	int32 SelectSlotIndex = 0;
 
+	UPROPERTY()
+	FSlotInfo RealSelectedSlot;
+
 	UFUNCTION()
 	UGridPanel* GetGribInventoryWidget(const E_SlotsType SlotType);
+
+
+
+	UFUNCTION() 
+	FSlotInfo GetRealSelectedSlot() { return RealSelectedSlot; }
 
 #pragma region InventoryFunctions
 public:
@@ -182,7 +228,45 @@ public:
 	UFUNCTION()
 	void LoadItemWidgets();
 
+	UFUNCTION()
+	int32 GetRowBySlotType(int32 InIndex, E_SlotsType InSlotType);
+
+	UFUNCTION()
+	int32 GetColumnBySlotType(int32 InIndex, E_SlotsType InSlotType);
+
+	UFUNCTION()
+	UInventorySlotWidget* GetSlotWidgetByIndex(int32 InIndex, E_SlotsType InSlotType);
+
 #pragma endregion
 
+
+#pragma region DragWidget
+
+private:
+	UPROPERTY()
+	UItemWidget* HidedItemWidgetWhenDragActive;
+
+	UPROPERTY()
+	UItemWidget* DragWidget;
+
+	UPROPERTY()
+	FVector2D Offset;
+
+
+	UFUNCTION()
+	void InitializeDragWidget();
+
+	UFUNCTION()
+	void SnapDraggedItemToGridSlot(float InDeltaTime);
+
+	UFUNCTION()
+	void ApplyOffset(int32& InIndex);
+
+	UFUNCTION()
+	int32 CalculateItemIndex(int32 ClickIndex,  FVector2D InOffset, int32 InventoryCols, int32 InventoryRows, int32 ItemRows, int32 ItemCols, bool bIsRotated, bool DefaultIsVertical, bool IsLongVerticalItem);
+
+	UFUNCTION()
+	void EndBackItemWidgetToSlots();
+#pragma endregion
 
 };

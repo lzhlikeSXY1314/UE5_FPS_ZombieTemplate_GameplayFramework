@@ -76,6 +76,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Item Widget Data")
 	EItemRotation Rotation = EItemRotation::Horizontal;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Item Widget Data")
+	bool IsLongVertical = false;
+
 };
 
 
@@ -130,7 +133,8 @@ public:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Item Widget Data")
 	FInventoryItemPayload InventoryItemPayload;
 
-
+	UPROPERTY()
+	FVector2D Offset;
 
 	UFUNCTION(BlueprintCallable, Category = "Item Widget|Background")
 	void SelectItemBackgroundMaterial(bool bIsSelected, bool bIsOpenMenu);
@@ -140,6 +144,13 @@ public:
 
 	UFUNCTION()
 	void SetAmount();
+
+	UFUNCTION()
+	void SetActiveBackgroundMaterial(bool InActive);
+
+	UFUNCTION()
+	int32 GetFirstOccupiedSlotIndex();
+
 private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> CachedMaterial;

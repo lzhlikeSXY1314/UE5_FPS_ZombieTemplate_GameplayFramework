@@ -25,9 +25,33 @@ void UInventorySlotWidget::NativeOnMouseEnter(const FGeometry& MyGeometry, const
     UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
     if (HUDComp)
     {
+        HUDComp->SetRealSelectedSlot(Index,SlotsType);
         HUDComp->SelectSlot(Index, SlotsType, true);
     }
 }
+
+FReply UInventorySlotWidget::NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+    FReply ParentReply = Super::NativeOnMouseButtonDown(MyGeometry, MouseEvent);
+    if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    {
+        TSharedRef<SWidget> SlateWidget = TakeWidget();
+        return FReply::Handled().DetectDrag(SlateWidget,EKeys::LeftMouseButton);
+    }
+    return ParentReply;
+
+}
+
+void UInventorySlotWidget::NativeOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& PointerEvent, UDragDropOperation*& OutDragDropOperation)
+{
+    Super::NativeOnDragDetected(MyGeometry, PointerEvent, OutDragDropOperation);
+    if (UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this))
+    {
+        HUDComp->OnDragDetected.Broadcast();
+    }
+}
+
+
 
 void UInventorySlotWidget::SetSlotSize(float Size)
 {
@@ -63,3 +87,4 @@ UMaterialInstance* UInventorySlotWidget::GetSlotMaterial(E_SlotState SlotState)
         return MI_FaceSlotNotSelected;
     }
 }
+
