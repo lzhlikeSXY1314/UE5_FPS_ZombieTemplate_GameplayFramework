@@ -129,6 +129,25 @@ int32 UItemWidget::GetFirstOccupiedSlotIndex()
     return -1;
 }
 
+void UItemWidget::PlayRotationAnimation_Implementation(EItemRotation InRotation)
+{
+    Rotation = InRotation;
+
+    const float CurrentWidth = SizeBox_Root->GetWidthOverride();
+    const float CurrentHeight = SizeBox_Root->GetHeightOverride();
+
+    SizeBox_Root->SetWidthOverride(CurrentHeight);
+    SizeBox_Root->SetHeightOverride(CurrentWidth);
+
+    
+    if (CachedMaterial)
+    {
+        float Angle = (Rotation == EItemRotation::Vertical) ? -0.25f : 0.0f;
+        CachedMaterial->SetScalarParameterValue(FName("Angle"), Angle);
+    }
+
+}
+
 void UItemWidget::SetItemWidgetAspectRatio()
 {
     if (!SizeBox_Root) return;

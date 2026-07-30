@@ -23,6 +23,7 @@ void UInventoryHUDComponent::BeginPlay()
     InitializeSlots();
 
     OnDragDetected.AddDynamic(this, &ThisClass::HandleDragDetected);
+    OnChangingAdditionalSlots.AddDynamic(this, &ThisClass::OnAdditionSlotsChanged);
 }
 
 void UInventoryHUDComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -69,7 +70,8 @@ void UInventoryHUDComponent::OpenInventory()
         PC->bShowMouseCursor = true;
         PC->SetPause(true);
         SetNameAndDescriptionText(FText::GetEmpty(), FText::GetEmpty());
-        DeselectAllSlots();
+        DeselectAllSlotsByType(E_SlotsType::Primary);
+        DeselectAllSlotsByType(E_SlotsType::Temp);
         LoadItemWidgets();
     }
 
@@ -88,19 +90,57 @@ void UInventoryHUDComponent::OpenInventory()
 
 void UInventoryHUDComponent::CloseInventory()
 {
+    if (DragWidget) DragWidget->RemoveFromParent();
+    DragWidget = nullptr;
 
+    if(HidedItemWidgetWhenDragActive) HidedItemWidgetWhenDragActive->RemoveFromParent();
+    HidedItemWidgetWhenDragActive = nullptr;
+
+    LoadPrimarySlotsFromArray();
     PlayInventorySound(E_InventorySoundType::Close,false);
+}
+
+void UInventoryHUDComponent::OnMouseButtonDown()
+{
+    if (DragWidget)
+    {
+        RotateItemWidget(true);
+        return;
+    }
+
+    if (InventoryWidget)
+    {
+        InventoryWidget->CloseInventory();
+        CloseInventory();
+        return;
+    }
+}
+
+void UInventoryHUDComponent::OnMouseButtonUp()
+{
+    if (DragWidget) MoveItem();
 }
 
 void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound)
 {
+    if (DragWidget)
+    {
+        const int32 InvCol = GetInventorySize(GetRealSelectedSlot().Type).X;
+        const int32 InvRow = GetInventorySize(GetRealSelectedSlot().Type).Y;
+        const FIntPoint ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
+
+        if ((ItemSize.X > InvCol|| ItemSize.Y > InvRow) && DragWidget->Rotation == EItemRotation::Horizontal) return;
+        if ((ItemSize.Y > InvCol || ItemSize.X > InvRow) && DragWidget->Rotation == EItemRotation::Vertical) return;
+    }
+
     int32 L_SelectSlotIndex = FMath::Max(InIndex, 0);
     
-    if (DragWidget) InShouldPlaySound &= (L_SelectSlotIndex != SelectSlotIndex || SelectSlotType != InSlotType);
 
     SelectSlotType = InSlotType;
 
     ApplyOffset(L_SelectSlotIndex); // 查空间，跟随拾取起点
+
+    if (DragWidget) InShouldPlaySound &= (L_SelectSlotIndex != SelectSlotIndex || SelectSlotType != InSlotType);
 
     SelectSlotIndex = FMath::Max(L_SelectSlotIndex, 0);
 
@@ -183,15 +223,9 @@ void UInventoryHUDComponent::DeselectAllItemWidget()
     }
 }
 
-void UInventoryHUDComponent::DeselectAllSlots()
+void UInventoryHUDComponent::DeselectAllSlotsByType(E_SlotsType InSlotType)
 {
-    for (UInventorySlotWidget* Slot : GetSlotsByType(E_SlotsType::Primary))
-    {
-        if (!Slot) continue;
-        Slot->SelectSlot(false);
-    }
-
-    for (UInventorySlotWidget* Slot : GetSlotsByType(E_SlotsType::Temp))
+    for (UInventorySlotWidget* Slot : GetSlotsByType(InSlotType))
     {
         if (!Slot) continue;
         Slot->SelectSlot(false);
@@ -285,6 +319,7 @@ void UInventoryHUDComponent::SetRealSelectedSlot(int32 InIndex, E_SlotsType InSl
 void UInventoryHUDComponent::InitializeSlots()
 {
     InventorySlots.Empty();
+    TempInventorySlots.Empty();
 
     const int32 PrimarySize = GetInventorySize(E_SlotsType::Primary).X * GetInventorySize(E_SlotsType::Primary).Y;
     InventorySlots.Reserve(PrimarySize);
@@ -295,6 +330,8 @@ void UInventoryHUDComponent::InitializeSlots()
         Slot.Index = i;
         InventorySlots.Add(Slot);
     }
+
+    bool UseTempSlots = UInventoryStaticFunctions::GetInventoryOptions(this)->bEnableTempSlots;
 
     if (UseTempSlots)
     {
@@ -313,6 +350,15 @@ void UInventoryHUDComponent::InitializeSlots()
         TempInventorySlots.Empty();
 
     }
+
+    //Initialize Hidden Slot
+    FSlotStruct SlotStruct;
+    SlotStruct.Index = 0;
+    SlotStruct.IsEmpty = true;
+    SlotStruct.IsPartOfItem = false;
+    SlotStruct.ItemReference = nullptr;
+    HiddenItemSlotsType = E_SlotsType::Primary;
+    HiddenSlots.Add(SlotStruct);
 
 }
 
@@ -497,7 +543,7 @@ void UInventoryHUDComponent::AddItem_HelperFunction(AInspectableItem* Item, cons
     NewItem->InventoryItemPayload.InventoryComponentReference = this;
 
     FillSlots(NewItem, Slots, SlotsType);
-
+    OnChangingAdditionalSlots.Broadcast();
 }
 
 void UInventoryHUDComponent::AddItemToSlots(AInspectableItem* Item , int32 ItemAmount, const E_SlotsType SlotType)
@@ -617,6 +663,20 @@ void UInventoryHUDComponent::ClearSlots(const E_SlotsType SlotsType, const TArra
 
         }
     }
+
+    if (Slots.IsValidIndex(0))
+    {
+        UItemWidget* ItemWidget = GetItemWidgetByIndex(Slots[0], SlotsType);
+
+        if (ItemWidget)
+        {
+            ItemsWidgets.Remove(ItemWidget);
+            ItemWidget->RemoveFromParent();
+               //SelectSlot
+        }
+    }
+  
+
 }
 
 void UInventoryHUDComponent::RemoveItemsInSlot(const int32 SlotIndex, const E_SlotsType SlotType, const int32 Amount, const bool RemoveAll)
@@ -686,22 +746,23 @@ void UInventoryHUDComponent::ClearAllItemWidgets()
 
 void UInventoryHUDComponent::LoadItemWidgets()
 {
-
     ClearAllItemWidgets();
 
     for (FSlotStruct& Slot : GetSlots(E_SlotsType::Primary))
     {
         if (Slot.IsEmpty || !Slot.ItemReference || Slot.IsPartOfItem) continue;
 
-        AddItemWidgetToGrib(Slot.ItemReference,false,false);
+        AddItemWidgetToGrib(Slot.ItemReference, E_SlotsType::Primary);
     }
+
 }
 
 int32 UInventoryHUDComponent::GetRowBySlotType(int32 InIndex, E_SlotsType InSlotType)
 {
     if (InIndex < 0) return -1;
     if(!UInventoryStaticFunctions::GetInventoryOptions(this))  return -1;
-    int32 Col = InSlotType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
+    int32 Col = GetInventorySize(InSlotType).X;
+    
     return UInventoryStaticFunctions::GetRow(InIndex, Col);
 }
 
@@ -709,7 +770,7 @@ int32 UInventoryHUDComponent::GetColumnBySlotType(int32 InIndex, E_SlotsType InS
 {
     if (InIndex < 0) return -1;
     if (!UInventoryStaticFunctions::GetInventoryOptions(this))  return -1;
-    int32 Col = InSlotType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
+    int32 Col = GetInventorySize(InSlotType).X;
     return UInventoryStaticFunctions::GetColumn(InIndex,Col);
 }
 
@@ -724,8 +785,7 @@ UInventorySlotWidget* UInventoryHUDComponent::GetSlotWidgetByIndex(int32 InIndex
     return nullptr;
 }
 
-
-void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, const bool CanDestory, const bool IsEquipped)
+void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, E_SlotsType SlotType)
 {
     if (!ItemWidgetClass || !IsValid(Item)) return;
     if (Item->InventoryItemPayload.OccupiedSlots.Num() == 0) return;
@@ -733,7 +793,7 @@ void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, const b
     UInventoryData* InvData = UInventoryStaticFunctions::GetInventoryOptions(this);
     if (!InvData) return;
 
-    const int32 Width = InvData->PrimaryConfig.Columns;
+    const int32 Width = GetInventorySize(SlotType).X;
     const int32 FirstSlot = Item->InventoryItemPayload.OccupiedSlots[0];
 
     APlayerController* PC = GetPlayerController();
@@ -744,14 +804,13 @@ void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, const b
 
     NewItemWidget->InventoryItemPayload = Item->InventoryItemPayload;
     NewItemWidget->InventoryItemPayload.InventoryComponentReference = this;
-    NewItemWidget->InventoryItemPayload.IsEquipped = IsEquipped;
     NewItemWidget->DefaultRotation = Item->InventoryItemPayload.Rotation;
     NewItemWidget->Rotation = Item->InventoryItemPayload.Rotation;
     NewItemWidget->SetItemWidgetAspectRatio();
 
     ItemsWidgets.Add(NewItemWidget);
 
-    UGridPanel* Grid = GetGribInventoryWidget(Item->InventoryItemPayload.SlotsType);
+    UGridPanel* Grid = GetGribInventoryWidget(SlotType);
     if (!Grid) return;
 
     const int32 Col = UInventoryStaticFunctions::GetColumn(FirstSlot, Width);
@@ -804,7 +863,8 @@ void UInventoryHUDComponent::InitializeDragWidget()
         if (!NewItemWidget) return;
         NewItemWidget->InventoryItemPayload = ItemWidget->InventoryItemPayload;
         NewItemWidget->DefaultRotation = ItemWidget->InventoryItemPayload.Rotation;
-      
+        NewItemWidget->Rotation = ItemWidget->InventoryItemPayload.Rotation;
+
         //获取从被点击的单元格到槽位项第一个单元格的偏移量
         int32 RealSelectedIndex = SlotInfo.Index;
         int32 Offsetcol = GetColumnBySlotType(RealSelectedIndex, SlotType) - GetColumnBySlotType(FirstOccupiedSlotIndex, SlotType);
@@ -847,6 +907,7 @@ void UInventoryHUDComponent::SnapDraggedItemToGridSlot(float InDeltaTime)
 {
     if (!DragWidget) return;
     UInventorySlotWidget* Slot = GetSlotWidgetByIndex(SelectSlotIndex, SelectSlotType);
+
     if (!Slot) return;
     UCanvasPanelSlot* DragWidgetSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(DragWidget);
     if (!DragWidgetSlot) return;
@@ -875,17 +936,15 @@ void UInventoryHUDComponent::ApplyOffset(int32& InIndex)
     E_SlotsType L_SlotsType = GetRealSelectedSlot().Type;
     FVector2D L_Offset = DragWidget->Offset;
 
-    if(!UInventoryStaticFunctions::GetInventoryOptions(this)) return;
-
-    const int32 Col = L_SlotsType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Columns : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Columns;
-    const int32 Row = L_SlotsType == E_SlotsType::Primary ? UInventoryStaticFunctions::GetInventoryOptions(this)->PrimaryConfig.Rows : UInventoryStaticFunctions::GetInventoryOptions(this)->TempConfig.Rows;
+    const int32 Col = GetInventorySize(L_SlotsType).X;
+    const int32 Row = GetInventorySize(L_SlotsType).Y;
 
     const int32 ItemSizeCol = DragWidget->InventoryItemPayload.ItemIconSize.X;
     const int32 ItemSizeRow = DragWidget->InventoryItemPayload.ItemIconSize.Y;
 
-    bool IsRotated = DragWidget->InventoryItemPayload.Rotation != DragWidget->DefaultRotation;
+    bool IsRotated = DragWidget->Rotation != DragWidget->DefaultRotation;
     bool DefaultIsVertical = DragWidget->DefaultRotation == EItemRotation::Vertical;
-    bool IsLongVertical = DragWidget->InventoryItemPayload.IsLongVertical;
+    bool IsLongVertical = DragWidget->InventoryItemPayload.ItemIconSize.X < DragWidget->InventoryItemPayload.ItemIconSize.Y;
 
     InIndex = CalculateItemIndex(InIndex, L_Offset, Col, Row, ItemSizeRow, ItemSizeCol, IsRotated, DefaultIsVertical, IsLongVertical);
 
@@ -1050,27 +1109,469 @@ void UInventoryHUDComponent::EndBackItemWidgetToSlots()
 
 }
 
+void UInventoryHUDComponent::RotateItemWidget(bool InPlaySound)
+{
+    if (!DragWidget) return;
+
+    if (DragWidget->InventoryItemPayload.ItemIconSize.X == DragWidget->InventoryItemPayload.ItemIconSize.Y) return;
+
+
+    const int32 InvCol = GetInventorySize(GetRealSelectedSlot().Type).X;
+    const int32 InvRow = GetInventorySize(GetRealSelectedSlot().Type).Y;
+    const FIntPoint ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
+    if (ItemSize.X > InvRow || ItemSize.X > InvCol || ItemSize.Y > InvRow || ItemSize.Y > InvCol) return;
+
+
+
+    if (InPlaySound) PlayInventorySound(E_InventorySoundType::Rotate, true);
+    DragWidget->PlayRotationAnimation(DragWidget->Rotation == EItemRotation::Horizontal ? EItemRotation::Vertical : EItemRotation::Horizontal);
+
+    SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type,false);
+
+}
+
+
 void UInventoryHUDComponent::HandleDragDetected()
 {
     if (IsValid(DragWidget))
     {
-        //Drag End
+        MoveItem();
         return;
     }
 
+    FSlotInfo SlotInfo = GetRealSelectedSlot();
+    UItemWidget* ItemWidget = GetItemWidgetByIndex(SlotInfo.Index, SlotInfo.Type);
+    if (!ItemWidget) return;
+
     PlayInventorySound(E_InventorySoundType::OnDragStart,true);
     InitializeDragWidget();
-    DeselectAllSlots();
+    DeselectAllSlotsByType(SelectSlotType);
     SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
 
 }
 
 
-
-
 /// </DragWidget>
 
+bool UInventoryHUDComponent::IsEmptySlotsForItem(const int32 Index, const int32 Width, const int32 Height, const E_SlotsType SlotType, const EItemRotation Rotation, TArray<int32>& EmptySlots, const TArray<int32>& ExcludeSlots)
+{
+    const int32 ItemWidth = Rotation == EItemRotation::Horizontal ? Width : Height;
+    const int32 ItemHeight = Rotation == EItemRotation::Horizontal ? Height : Width;
 
+    if (CheckSize(Index, ItemWidth, ItemHeight, SlotType) &&
+        CheckSlots(Index, ItemWidth, ItemHeight, EmptySlots, SlotType, ExcludeSlots))
+    {
+        return true;
+    }
+    return false;
+
+}
+
+bool UInventoryHUDComponent::CanItemAddedToSlots(const int32 SlotOfItem, const E_SlotsType ItemSlotType, const EItemRotation Rotation, const int32 SlotToAdd, const E_SlotsType SlotsTypeToAdd, TArray<int32>& EmptySlots)
+{
+    //交换
+    if (IsValidSwappedItem() && ItemSlotType != E_SlotsType::HiddenSlots) return false;
+    AInspectableItem* ItemInSlot;
+    if (IsValidSwappedItem() && GetItemInSlot(SlotToAdd, SlotsTypeToAdd, ItemInSlot))
+    {
+        if (GetSlots(E_SlotsType::HiddenSlots)[0].ItemReference == ItemInSlot) return false;
+        if (ItemInSlot->InventoryItemPayload.SlotsType == ItemSlotType) return false;
+    }
+
+
+    FSlotStruct SlotInfo;
+    if (GetSlots(ItemSlotType).IsValidIndex(SlotOfItem))
+    {
+        SlotInfo = GetSlots(ItemSlotType)[SlotOfItem];
+    }
+
+    if (!IsValid(SlotInfo.ItemReference)) return false;
+    const FIntPoint ItemSize = SlotInfo.ItemReference->InventoryItemPayload.ItemIconSize;
+    TArray<int32> ExcludeSlots = SlotInfo.ItemReference->InventoryItemPayload.OccupiedSlots;
+
+    if (IsEmptySlotsForItem(SlotToAdd, ItemSize.X, ItemSize.Y, SlotsTypeToAdd, Rotation, EmptySlots,
+        ItemSlotType == SlotsTypeToAdd ? ExcludeSlots : TArray<int32>()))
+    {
+        return true;
+    }
+    return false;
+     
+}
+
+void UInventoryHUDComponent::MoveItem()
+{
+    if (!DragWidget) return;
+    TArray<int32> EmptySlots;
+    const int32 FirstOccupiedSlotIndex = DragWidget->GetFirstOccupiedSlotIndex();
+    E_SlotsType SlotType = DragWidget->InventoryItemPayload.SlotsType;
+
+    bool IsEmptySpace = CanItemAddedToSlots(FirstOccupiedSlotIndex, SlotType, DragWidget->Rotation, SelectSlotIndex, SelectSlotType, EmptySlots);
+    if (IsEmptySpace)
+    {
+        PlayInventorySound(E_InventorySoundType::OnDragEnd,true);
+        AInspectableItem* Item;
+        if(!GetItemInSlot(FirstOccupiedSlotIndex, SlotType, Item)) return;
+        if (!Item) return;
+
+        if (SelectSlotType != E_SlotsType::Equipment) ClearSlots(Item->InventoryItemPayload.SlotsType, Item->InventoryItemPayload.OccupiedSlots);
+        //HiddenItemSlotsType = E_SlotsType::Primary; 目前不知道干什么的
+
+        AddExistingItemToSlots(Item, SelectSlotType, DragWidget->Rotation, EmptySlots);
+
+        if (SlotType != SelectSlotType) OnChangingAdditionalSlots.Broadcast();
+
+
+        DragWidget->RemoveFromParent();
+        DragWidget = nullptr;
+        
+        //其他比图说controls hints widget;
+ 
+
+
+        return;
+    }
+
+     AInspectableItem* ItemUnderDragItem = nullptr;
+
+     const int32 L_FirstSlotsIndex = DragWidget->GetFirstOccupiedSlotIndex();
+     const E_SlotsType L_SlotsType = DragWidget->InventoryItemPayload.SlotsType;
+     const EItemRotation L_Rotation = DragWidget->Rotation;
+     const FIntPoint L_ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
+     FSlotInfo SelectedSlotInfo;
+     SelectedSlotInfo.Index = SelectSlotIndex;
+     SelectedSlotInfo.Type = SelectSlotType;
+
+    if (CanSwapDraggedItem(L_FirstSlotsIndex, L_SlotsType, SelectSlotIndex, SelectSlotType, L_Rotation, ItemUnderDragItem))
+    {
+
+        CreateSwapItemWidget(ItemUnderDragItem);
+        SwapDraggedItem(L_FirstSlotsIndex, L_SlotsType, SelectedSlotInfo.Index, SelectedSlotInfo.Type, L_Rotation, L_ItemSize);
+        return;
+    }
+    //交换一个垂直东西会有问题 注意修改
+
+
+
+}
+
+void UInventoryHUDComponent::CreateSwapItemWidget(AInspectableItem* ItemUnderDragItem)
+{
+    if (!ItemUnderDragItem) return;
+    if (!ItemUnderDragItem->InventoryItemPayload.OccupiedSlots.IsValidIndex(0)) return;
+    const int32 UnderDragItemSlotFirstIndex = ItemUnderDragItem->InventoryItemPayload.OccupiedSlots[0];
+    const E_SlotsType UnderDragItemSlotType = ItemUnderDragItem->InventoryItemPayload.SlotsType;
+
+    //ItemWidget获取被交换的ItemWidget控件
+    UItemWidget* ItemWidget = GetItemWidgetByIndex(UnderDragItemSlotFirstIndex, UnderDragItemSlotType);
+    if (!ItemWidget) return;
+    ItemWidget->SetVisibility(ESlateVisibility::Collapsed);
+    PlayInventorySound(E_InventorySoundType::OnDragEnd, true);
+
+    //InitializeDragWidgetForSwappedItem
+    if (DragWidget)
+    {
+        DragWidget->RemoveFromParent();
+        DragWidget = nullptr;
+    }
+
+    APlayerController* PC = GetPlayerController();
+    UItemWidget* NewItemWidget = CreateWidget<UItemWidget>(PC, ItemWidgetClass); //新建的DragWidget就是被置换的东东
+    NewItemWidget->InventoryItemPayload = ItemWidget->InventoryItemPayload;
+    NewItemWidget->Rotation = ItemWidget->InventoryItemPayload.Rotation;
+    NewItemWidget->DefaultRotation = ItemWidget->InventoryItemPayload.Rotation;
+    NewItemWidget->InventoryItemPayload.SlotsType = E_SlotsType::HiddenSlots; //不可缺
+    NewItemWidget->InventoryItemPayload.OccupiedSlots = { 0 };//不可缺
+
+    if (!NewItemWidget) return;
+    NewItemWidget->SetItemWidgetAspectRatio();
+    if (!InventoryWidget || !InventoryWidget->CanvasPanel_Root) return;
+    UCanvasPanelSlot* NewItemWidgetSlot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(NewItemWidget);
+    NewItemWidgetSlot->SetAutoSize(true);
+
+    if (!ItemWidget->InventoryItemPayload.OccupiedSlots.IsValidIndex(0)) return;
+    SelectSlot(ItemWidget->InventoryItemPayload.OccupiedSlots[0], SelectSlotType, false);  //
+    DeselectAllItemWidget();
+    NewItemWidget->SetActiveBackgroundMaterial(true);
+
+    UInventorySlotWidget* SlotWidget = GetSlotWidgetByIndex(UnderDragItemSlotFirstIndex, UnderDragItemSlotType); //被交换的ItemWidget第一个格子
+    if (!SlotWidget) return;
+    SlotWidget->SelectSlot(false);
+
+    const FGeometry& CachedGeometry = SlotWidget->GetCachedGeometry();
+    FVector2D ViewportPos;
+    FVector2D PixelPosition;
+
+    USlateBlueprintLibrary::LocalToViewport(
+        this,
+        CachedGeometry,
+        FVector2D::ZeroVector,
+        PixelPosition,
+        ViewportPos
+    );
+    UWidgetLayoutLibrary::SlotAsCanvasSlot(NewItemWidget)->SetPosition(ViewportPos);
+
+    DragWidget = NewItemWidget;
+
+    //InitializeDragWidgetForSwappedItem Finish
+
+}
+
+
+void UInventoryHUDComponent::AddExistingItemToSlots(AInspectableItem* Item, const E_SlotsType SlotsType, const EItemRotation Rotation, const TArray<int32>& EmptySlots)
+{
+    if (!IsValid(Item)) return;
+    Item->InventoryItemPayload.OccupiedSlots = EmptySlots;
+    Item->InventoryItemPayload.Rotation = Rotation;
+    Item->InventoryItemPayload.SlotsType = SlotsType;
+    Item->InventoryItemPayload.InventoryComponentReference = this;
+
+    FillSlots(Item, EmptySlots, SlotsType);
+    OnChangingAdditionalSlots.Broadcast();
+    AddItemWidgetToGrib(Item, SelectSlotType);
+
+
+}
+
+TArray<int32> UInventoryHUDComponent::GetSlotsByItemSize(const int32 FirstSlot, const E_SlotsType SlotsType, const FIntPoint ItemSize, const EItemRotation Rotation)
+{
+    TArray<int32> EmptySlots;
+    const int32 Height = Rotation == EItemRotation::Horizontal ? ItemSize.Y : ItemSize.X;
+    const int32 Width = Rotation == EItemRotation::Horizontal ? ItemSize.X : ItemSize.Y;
+
+    if (!CheckSize(FirstSlot, Width, Height, SlotsType)) return EmptySlots;
+
+    for (int i = 0; i < Height; ++i)
+    {
+        const int32 TempIndex = FirstSlot + (i == 0 ? 0 : GetInventorySize(SlotsType).X * i);
+
+        for (int x = TempIndex; x < TempIndex + Width; ++x)
+        {
+            if (GetSlots(SlotsType).IsValidIndex(x))
+            {
+                EmptySlots.Add(x);
+            }
+        }
+    }
+    return EmptySlots;
+
+}
+
+TArray<AInspectableItem*> UInventoryHUDComponent::GetAllItemsInSlots(TArray<int32> Slots, E_SlotsType SlotsType)
+{
+    TArray<AInspectableItem*> ItemsInSlots;
+
+    for (int32 const& Slot : Slots)
+    {
+        if (!GetSlots(SlotsType).IsValidIndex(Slot)) continue;
+        if (GetSlots(SlotsType)[Slot].IsEmpty) continue;
+
+        AInspectableItem* Item = GetSlots(SlotsType)[Slot].ItemReference;
+
+        if (IsValid(Item) && (ItemsInSlots.Find(Item) == -1))
+        {
+            ItemsInSlots.Add(Item);
+        }
+    }
+    return ItemsInSlots;
+}
+
+bool UInventoryHUDComponent::CanSwapDraggedItem(const int32 ItemToIgnoreSlotIndex, const E_SlotsType ItemToIgnoreSlotsType, const int32 SelectedIndex, const E_SlotsType SelectedSlotsType, const EItemRotation DraggedItemRotation, AInspectableItem*& OutTargetItem)
+{
+    if (!DragWidget) return false;
+
+    const FIntPoint ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
+    const TArray<int32> TargetSlots = GetSlotsByItemSize(SelectedIndex, SelectedSlotsType, ItemSize, DraggedItemRotation);
+    if (TargetSlots.Num() != ItemSize.X * ItemSize.Y) return false;
+
+    TArray<AInspectableItem*> Items = GetAllItemsInSlots(TargetSlots, SelectedSlotsType);
+
+    // 如果目标区域包含被拖拽物品自己的格子，移除它自身
+    if (SelectedSlotsType == ItemToIgnoreSlotsType)
+    {
+        AInspectableItem* SelfItem;
+        if (GetItemInSlot(ItemToIgnoreSlotIndex, ItemToIgnoreSlotsType, SelfItem))
+        {
+            Items.Remove(SelfItem);
+        }
+    }
+
+    // 必须恰好剩1个有效物品
+    if (Items.Num() == 1 && IsValid(Items[0]))
+    {
+        OutTargetItem = Items[0];  // 直接赋值指针
+        return true;
+    }
+
+    OutTargetItem = nullptr;
+    return false;
+
+}
+
+
+
+void UInventoryHUDComponent::SwapDraggedItem(const int32 ItemIndex, const E_SlotsType SlotsType, const int32 SelectedIndex, const E_SlotsType SelectedSlotsType, const EItemRotation DraggedItemRotation, FIntPoint ItemSize)
+{
+    //传入 是先前拖拽数据
+   
+    AInspectableItem* DraggedItem = nullptr; //要置放的物品
+    if (!GetItemInSlot(ItemIndex, SlotsType, DraggedItem) || !IsValid(DraggedItem)) return;
+
+    TArray<int32> TargetSlots = GetSlotsByItemSize(SelectedIndex, SelectedSlotsType, ItemSize, DraggedItemRotation);
+
+    if (SelectedSlotsType != E_SlotsType::Equipment)
+    {
+        const int32 ExpectedSlotCount = ItemSize.X * ItemSize.Y;
+        if (TargetSlots.Num() != ExpectedSlotCount) return;
+
+    }
+
+    TArray<AInspectableItem*> ItemsInTargetSlots = GetAllItemsInSlots(TargetSlots, SelectedSlotsType);
+
+    if (SelectedSlotsType != E_SlotsType::Equipment)
+    {
+        // 初始校验：目标槽位中必须有且仅有1个物品（未处理拖拽物品本身前）
+        if (ItemsInTargetSlots.Num() != 1 || !ItemsInTargetSlots.IsValidIndex(0))
+        {
+            // 如果拖拽物品的原槽位类型和目标槽位类型相同，可能目标槽位包含自身，需要移除后再检查
+            if (DraggedItem->InventoryItemPayload.SlotsType == SlotsType)
+            {
+                const int32 DraggedItemIndex = ItemsInTargetSlots.Find(DraggedItem);
+                if (DraggedItemIndex == -1)
+                {
+
+                    return; // 没有找到自身
+                }
+                ItemsInTargetSlots.RemoveAt(DraggedItemIndex);  // 移除自身后重新检查数量
+            }
+
+            // 最终校验：处理后必须剩余1个物品
+            if (ItemsInTargetSlots.Num() != 1)
+            {
+
+                return;
+            }
+        }
+    }
+
+    if (!ItemsInTargetSlots.IsValidIndex(0)) return;
+
+    AInspectableItem* ItemToSwap = ItemsInTargetSlots[0]; //获得了被交换的物品
+    if (!IsValid(ItemToSwap)) return;
+
+    if (!HiddenSlots.IsValidIndex(0) || !GetSlots(E_SlotsType::HiddenSlots).IsValidIndex(0)) return;
+
+    FSlotStruct HiddenSlot;
+    HiddenSlot.IsEmpty = false;
+    HiddenSlot.ItemReference = ItemToSwap;
+
+    HiddenItemSlotsType = E_SlotsType::Primary; //有啥用？？
+
+    ClearSlots(DraggedItem->InventoryItemPayload.SlotsType, DraggedItem->InventoryItemPayload.OccupiedSlots);  // 清空拖拽物品原来的槽位
+    ClearSlots(SelectedSlotsType, ItemToSwap->InventoryItemPayload.OccupiedSlots);    // 清空被交换物品原来的槽位
+
+    ItemToSwap->InventoryItemPayload.SlotsType = E_SlotsType::HiddenSlots;  // 标记为隐藏槽位物品
+    ItemToSwap->InventoryItemPayload.OccupiedSlots = { 0 };                  // 隐藏槽位只有1个（索引0）
+    HiddenSlots[0] = HiddenSlot;                      // 写入隐藏槽位数据
+
+    AddExistingItemToSlots(DraggedItem, SelectedSlotsType, DraggedItemRotation, TargetSlots);
+
+}
+
+bool UInventoryHUDComponent::IsValidSwappedItem() const
+{
+    if (HiddenSlots.IsValidIndex(0) && HiddenSlots[0].ItemReference)
+        return true;
+    return false;
+}
+
+void UInventoryHUDComponent::OnAdditionSlotsChanged()
+{
+    if ((!IsSlotsHaveItems(E_SlotsType::Temp)))
+    {
+        if (!IsValidSwappedItem())	SavePrimarySlotsInArray();
+    }
+}
+
+bool UInventoryHUDComponent::IsSlotsHaveItems(const E_SlotsType SlotsType)
+{
+    for (const FSlotStruct& Slot : GetSlots(SlotsType))
+    {
+        if (!Slot.IsEmpty) return true;
+    }
+    return false;
+}
+
+void UInventoryHUDComponent::SavePrimarySlotsInArray()
+{
+    SavedPrimaryItemsArray.Empty();
+
+    for (const auto& Slot : GetSlots(E_SlotsType::Primary))
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference))
+        {
+            FItemDataInfo Data;
+            Data.Item = Slot.ItemReference;
+            Data.Slots = Slot.ItemReference->InventoryItemPayload.OccupiedSlots;
+            Data.Rotation = Slot.ItemReference->InventoryItemPayload.Rotation;
+            Data.SlotsType = Slot.ItemReference->InventoryItemPayload.SlotsType;
+            SavedPrimaryItemsArray.Add(Data);
+        }
+    }
+}
+
+void UInventoryHUDComponent::LoadPrimarySlotsFromArray()
+{
+    if (SavedPrimaryItemsArray.Num() > 0 && IsSlotsHaveItems(E_SlotsType::Temp) || IsValidSwappedItem())
+    {
+        ClearAllSlotsByType(E_SlotsType::Primary);
+        ClearAllSlotsByType(E_SlotsType::Temp);
+
+        for (const FItemDataInfo& Data : SavedPrimaryItemsArray)
+        {
+            if (!IsValid(Data.Item)) continue;
+
+
+            Data.Item->InventoryItemPayload.OccupiedSlots = Data.Slots;
+            Data.Item->InventoryItemPayload.Rotation = Data.Rotation;
+            Data.Item->InventoryItemPayload.SlotsType = Data.SlotsType;
+
+            FillSlots(Data.Item, Data.Slots, Data.SlotsType);
+
+
+        }
+
+        if (HiddenSlots.IsValidIndex(0) && IsValid(HiddenSlots[0].ItemReference))
+        {
+            HiddenSlots[0].ItemReference = nullptr;
+            HiddenSlots[0].IsEmpty = true;
+            HiddenItemSlotsType = E_SlotsType::Primary;
+        }
+    }
+}
+
+void UInventoryHUDComponent::ClearAllSlotsByType(const E_SlotsType SlotsType)
+{
+    for (const FSlotStruct& Slot : GetSlots(SlotsType))
+    {
+        if (!GetSlots(SlotsType).IsValidIndex(Slot.Index)) continue;
+        GetSlots(SlotsType)[Slot.Index].IsEmpty = true;
+        GetSlots(SlotsType)[Slot.Index].IsPartOfItem = false;
+        GetSlots(SlotsType)[Slot.Index].ItemReference = nullptr;
+
+    }
+
+    for (int i = ItemsWidgets.Num() - 1; i >= 0; --i)
+    {
+        UItemWidget* Item = ItemsWidgets[i];
+        if (!IsValid(Item)) continue;
+
+        if (Item->InventoryItemPayload.SlotsType == SlotsType)
+        {
+            Item->RemoveFromParent();
+            ItemsWidgets.RemoveAt(i);
+        }
+    }
+}
 
 
 

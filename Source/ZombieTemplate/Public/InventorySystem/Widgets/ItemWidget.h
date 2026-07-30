@@ -76,8 +76,6 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Item Widget Data")
 	EItemRotation Rotation = EItemRotation::Horizontal;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Item Widget Data")
-	bool IsLongVertical = false;
 
 };
 
@@ -150,6 +148,10 @@ public:
 
 	UFUNCTION()
 	int32 GetFirstOccupiedSlotIndex();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
+	void PlayRotationAnimation(EItemRotation InRotation);
+	virtual void PlayRotationAnimation_Implementation(EItemRotation InRotation);
 
 private:
 	UPROPERTY()

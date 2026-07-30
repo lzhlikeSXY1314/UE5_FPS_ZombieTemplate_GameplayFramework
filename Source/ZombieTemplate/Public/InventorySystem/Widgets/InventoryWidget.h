@@ -24,7 +24,7 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent) override;
-
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent) override;
 
 public:
 
@@ -56,6 +56,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void SetText(const FText& BaseSlots, const FText& TempSlots);
 
+	void CloseInventory();
+
 
 
 private:
@@ -63,5 +65,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TArray<FKey> CloseInventoryKeys;
 
-	void CloseInventory();
+	void OnMouseButtonDown();
+
+	void OnMouseButtonUp();
+
 };

@@ -12,7 +12,7 @@
 
 //ÉùÃ÷Î¯ÍÐ
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryDragDetected); //ÍÏ×§
-
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnChangingAdditionalSlots);
 
 #pragma region Structs
 USTRUCT(BlueprintType)
@@ -52,6 +52,32 @@ struct FSlotInfo
 	E_SlotsType Type = E_SlotsType::Primary;
 };
 
+
+USTRUCT(BlueprintType)
+struct FItemDataInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	AInspectableItem* Item;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	TArray<int32> Slots;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	EItemRotation Rotation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slot")
+	E_SlotsType SlotsType;
+
+	FItemDataInfo() :
+		Item(nullptr),
+		Rotation(EItemRotation::Horizontal),
+		SlotsType(E_SlotsType::Primary)
+	{
+	}
+};
+
 #pragma endregion
 
 class UInventoryWidget;
@@ -73,8 +99,6 @@ public:
 	UInventoryHUDComponent();
 
 public:	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
-	bool UseTempSlots;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	TArray<FSlotStruct> InventorySlots;
@@ -105,10 +129,14 @@ public:
 	
 	void OpenInventory();
 	void CloseInventory();
+
+	void OnMouseButtonDown();
+	void OnMouseButtonUp();
+
 	void SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound);
 
 	void DeselectAllItemWidget();
-	void DeselectAllSlots();
+	void DeselectAllSlotsByType(E_SlotsType InSlotType);
 	void SetNameAndDescriptionText(const FText ItemName, const FText ItemDesc);
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Sound")
@@ -124,7 +152,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Drag")
 	FOnInventoryDragDetected OnDragDetected;
 
-
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Drag")
+	FOnChangingAdditionalSlots OnChangingAdditionalSlots;
 
 private:
 	UFUNCTION()
@@ -204,7 +233,7 @@ public:
 	void SetItemAmount(AInspectableItem* Item, const int32 Amount);
 
 	UFUNCTION()
-	void AddItemWidgetToGrib(AInspectableItem* Item, const bool CanDestory, const bool IsEquipped);
+	void AddItemWidgetToGrib(AInspectableItem* Item, E_SlotsType SlotType);
 
 	UFUNCTION()
 	void ClearSlots(const E_SlotsType SlotsType, const TArray<int32>& Slots);
@@ -267,6 +296,61 @@ private:
 
 	UFUNCTION()
 	void EndBackItemWidgetToSlots();
+
+	UFUNCTION()
+	void RotateItemWidget(bool InPlaySound);
+
 #pragma endregion
 
+#pragma region MoveItem
+
+public:
+
+
+private:
+	bool IsEmptySlotsForItem(const int32 Index, const int32 Width, const int32 Height, const E_SlotsType SlotType, const EItemRotation Rotation, TArray<int32>& EmptySlots, const TArray<int32>& ExcludeSlots);
+	
+	bool CanItemAddedToSlots(const int32 SlotOfItem, const E_SlotsType ItemSlotType, const EItemRotation Rotation, const int32 SlotToAdd, const E_SlotsType SlotsTypeToAdd, TArray<int32>& EmptySlots);
+
+	void MoveItem();
+
+	void AddExistingItemToSlots(AInspectableItem* Item, const E_SlotsType SlotsType, const EItemRotation Rotation, const TArray<int32>& EmptySlots);
+
+	TArray<int32> GetSlotsByItemSize(const int32 FirstSlot, const E_SlotsType SlotsType, const FIntPoint ItemSize, const EItemRotation Rotation);
+
+	TArray<AInspectableItem*> GetAllItemsInSlots(TArray<int32> Slots, E_SlotsType SlotsType);
+
+	bool CanSwapDraggedItem(const int32 ItemToIgnoreSlotIndex, const E_SlotsType ItemToIgnoreSlotsType,const int32 SelectedIndex, const E_SlotsType SelectedSlotsType,  const EItemRotation DraggedItemRotation, AInspectableItem*& OutTargetItem);
+
+	void CreateSwapItemWidget(AInspectableItem* ItemUnderDragItem);
+
+	void SwapDraggedItem(const int32 ItemIndex, const E_SlotsType SlotsType, const int32 SelectedIndex, const E_SlotsType SelectedSlotsType, const EItemRotation DraggedItemRotation, FIntPoint ItemSize);
+
+	bool IsValidSwappedItem() const;
+
+#pragma endregion
+
+#pragma region SavePrimary
+
+private:
+
+	UPROPERTY()
+	TArray<FItemDataInfo> SavedPrimaryItemsArray;
+
+	UFUNCTION()
+	void OnAdditionSlotsChanged();
+
+	UFUNCTION()
+	bool IsSlotsHaveItems(const E_SlotsType SlotsType);
+
+	UFUNCTION()
+	void SavePrimarySlotsInArray();
+
+		UFUNCTION()
+	void LoadPrimarySlotsFromArray();
+
+	UFUNCTION()
+	void ClearAllSlotsByType(const E_SlotsType SlotsType);
+
+#pragma endregion
 };

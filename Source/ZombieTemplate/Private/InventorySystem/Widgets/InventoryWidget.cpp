@@ -31,11 +31,22 @@ FReply UInventoryWidget::NativeOnMouseButtonDown(const FGeometry& MyGeometry, co
 {
     if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
     {
-        CloseInventory();
+        OnMouseButtonDown();
         return FReply::Handled();
     }
 
     return Super::NativeOnMouseButtonDown(MyGeometry, InMouseEvent);
+}
+
+FReply UInventoryWidget::NativeOnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    {
+        OnMouseButtonUp();
+        return FReply::Handled();
+    }
+
+    return Super::NativeOnMouseButtonUp(MyGeometry, InMouseEvent);
 }
 
 void UInventoryWidget::SetText(const FText& BaseSlots, const FText& TempSlots)
@@ -71,4 +82,24 @@ void UInventoryWidget::CloseInventory()
         HUDComp->CloseInventory();
     }
 
+}
+
+void UInventoryWidget::OnMouseButtonDown()
+{
+
+    UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+    if (HUDComp)
+    {
+        HUDComp->OnMouseButtonDown();
+    }
+
+}
+
+void UInventoryWidget::OnMouseButtonUp()
+{
+    UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+    if (HUDComp)
+    {
+        HUDComp->OnMouseButtonUp();
+    }
 }
