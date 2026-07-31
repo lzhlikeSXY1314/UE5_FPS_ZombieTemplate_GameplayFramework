@@ -65,3 +65,12 @@ enum class EItemRotation : uint8
     Vertical = 1
 };
 
+UENUM(BlueprintType)
+enum class EInventoryStatus : uint8
+{
+    Opened,
+    Closed,
+    Draged,
+    HasItemInTemp,
+    Menu
+};

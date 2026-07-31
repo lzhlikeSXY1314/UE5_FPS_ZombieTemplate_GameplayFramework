@@ -20,9 +20,6 @@ class ZOMBIETEMPLATE_API IInteractable
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 
 public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interaction")
-	FText GetItemName() const;
-
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interaction|UI")
 	void ShowWidget();
 
@@ -38,9 +35,5 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interaction")
 	void OnInteract(AActor* Interactor);
 	virtual void OnInteract_Implementation(AActor* Interactor) = 0;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interaction")
-	int32 GetAmmoAmount() const;
-	virtual int32 GetAmmoAmount_Implementation() const { return 0; }
 
 };

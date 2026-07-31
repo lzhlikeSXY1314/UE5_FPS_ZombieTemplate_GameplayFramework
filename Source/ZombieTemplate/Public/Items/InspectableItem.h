@@ -37,8 +37,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* VisualMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
-	FText ItemName;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
 	FVector MeshScale = FVector(1.0f);
@@ -50,11 +49,28 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget Data")
 	FInventoryItemPayload InventoryItemPayload;
 
+	UFUNCTION(BlueprintCallable, Category = "Item Widget Data")
+	FText GetItemInteractMes(bool bShowAmount = true) const
+	{
+		if (bShowAmount)
+		{
+			return FText::Format(
+				NSLOCTEXT("ItemName", "ItemAmount", "{0} X {1}"),
+				FText::FromString(InventoryItemPayload.ItemName),
+				FText::AsNumber(InventoryItemPayload.ItemAmount)
+			);
+		}
+		else
+		{
+			return FText::FromString(InventoryItemPayload.ItemName);
+		}
+	}
+
 
 //接口重写：
-	virtual FText GetItemName_Implementation() const override { return ItemName; }
+
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
-	virtual int32 GetAmmoAmount_Implementation() const override { return 0; }
+
 //接口
 
 

@@ -14,6 +14,9 @@ class UWidgetSwitcher;
 class USizeBox;
 class UInventoryHUDComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAmountChange, int32, InAmount);
+
+
 // 核心物品数据结构体
 USTRUCT(BlueprintType)
 struct FInventoryItemPayload
@@ -33,10 +36,10 @@ public:
 	FIntPoint ItemIconSize = FIntPoint(1, 1);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
-	FText ItemName;
+	FString ItemName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
-	FText ItemDescription;
+	FString ItemDescription;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	bool IsEquipped = false;
@@ -76,6 +79,34 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Item Widget Data")
 	EItemRotation Rotation = EItemRotation::Horizontal;
 
+	//Menu: 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bUseEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bShortcutEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bInspectEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bCombineEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bDiscardEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bSplitEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bEquipEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bAttachAttachmentEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
+	bool bDetachAttachmentEnabled = false;
 
 };
 
@@ -98,8 +129,8 @@ public:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> BulletImage;
 
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UTextBlock> Amount_Text;
+	//UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
+	//TObjectPtr<UTextBlock> Amount_Text;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidgetSwitcher> WidgetSwitcher_Equip;
@@ -149,9 +180,22 @@ public:
 	UFUNCTION()
 	int32 GetFirstOccupiedSlotIndex();
 
+
+
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
 	void PlayRotationAnimation(EItemRotation InRotation);
 	virtual void PlayRotationAnimation_Implementation(EItemRotation InRotation);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
+	void PlayRotationToDefaultAnimation();
+	virtual void PlayRotationToDefaultAnimation_Implementation();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
+	void HideInfoOverlayAnimation();
+	virtual void HideInfoOverlayAnimation_Implementation();
+
+	UPROPERTY(BlueprintAssignable, Category = "ItemWIdget|Delegate")
+	FOnAmountChange OnAmountChange;
 
 private:
 	UPROPERTY()

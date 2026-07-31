@@ -8,7 +8,9 @@
 #include <InventorySystem/Widgets/ItemWidget.h>
 #include "Items/InspectableItem.h"
 #include <Components/GridPanel.h>
+#include <InventorySystem/Structs/InventoryTypes.h>
 #include "InventoryHUDComponent.generated.h"
+
 
 //ÉùÃ÷Î¯ÍÐ
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryDragDetected); //ÍÏ×§
@@ -78,11 +80,34 @@ struct FItemDataInfo
 	}
 };
 
+
+USTRUCT(BlueprintType)
+struct FShortcut
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Shortcut")
+	bool IsEmpty;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Shortcut")
+	int32 Index;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Shortcut")
+	AInspectableItem* Item;
+
+	FShortcut() : IsEmpty(true), Index(-1), Item(nullptr)
+	{
+	}
+};
+
+
 #pragma endregion
 
 class UInventoryWidget;
 class UInventorySlotWidget;
 class UInventoryGridPanelWidget;
+class UItemMenu;
+
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZOMBIETEMPLATE_API UInventoryHUDComponent : public UActorComponent
@@ -112,9 +137,6 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	E_SlotsType HiddenItemSlotsType;
 
-	//UPROPERTY(BlueprintReadWrite, Category = "Inventory")
-	//TArray<FItemDataInfo> SavedPrimaryItemsArray;
-
 	UPROPERTY(BlueprintReadWrite, Category = "Inventory")
 	AInspectableItem* EquippedItem;
 
@@ -130,8 +152,8 @@ public:
 	void OpenInventory();
 	void CloseInventory();
 
-	void OnMouseButtonDown();
-	void OnMouseButtonUp();
+	void OnMouseButtonDown(FKey InKey);
+	void OnMouseButtonUp(FKey InKey);
 
 	void SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound);
 
@@ -139,10 +161,10 @@ public:
 	void DeselectAllSlotsByType(E_SlotsType InSlotType);
 	void SetNameAndDescriptionText(const FText ItemName, const FText ItemDesc);
 
-	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Sound")
+	UPROPERTY( BlueprintReadOnly, Category = "Inventory|Sound")
 	TObjectPtr<UAudioComponent> UI_Sound = nullptr;
 
-	UFUNCTION(Category = "Inventory|Sound")
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Sound")
 	void PlayInventorySound(E_InventorySoundType SoundType, bool bUnstoppable = false);
 
 	UFUNCTION()
@@ -189,9 +211,14 @@ private:
 	UGridPanel* GetGribInventoryWidget(const E_SlotsType SlotType);
 
 
-
 	UFUNCTION() 
 	FSlotInfo GetRealSelectedSlot() { return RealSelectedSlot; }
+	
+	UPROPERTY()
+	bool UseTempSlots;
+
+	UFUNCTION()
+	void DestroyAllTempObjects();
 
 #pragma region InventoryFunctions
 public:
@@ -228,7 +255,7 @@ public:
 	UFUNCTION()
 	void AddItemToSlots(AInspectableItem* Item,  int32 ItemAmount,const E_SlotsType SlotType);
 
-	bool FindItemToStack(AInspectableItem*& Item, const TArray<FSlotStruct>& Slots, int32& CanAdd, bool IsStackable, const int32 MaxStack, const FText ItemName);
+	bool FindItemToStack(AInspectableItem*& Item, const TArray<FSlotStruct>& Slots, int32& CanAdd, bool IsStackable, const FString ItemName);
 	
 	void SetItemAmount(AInspectableItem* Item, const int32 Amount);
 
@@ -279,6 +306,9 @@ private:
 	UItemWidget* DragWidget;
 
 	UPROPERTY()
+	UItemWidget* DragCancelWidget;
+
+	UPROPERTY()
 	FVector2D Offset;
 
 
@@ -299,6 +329,11 @@ private:
 
 	UFUNCTION()
 	void RotateItemWidget(bool InPlaySound);
+
+	UFUNCTION()
+	void CancelDrag(bool InPlaySound);
+
+
 
 #pragma endregion
 
@@ -328,6 +363,12 @@ private:
 
 	bool IsValidSwappedItem() const;
 
+	bool CanStackDraggedItem(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType, const EItemRotation DraggedItemRotation);
+
+	int32 CalculateItemAmountAfterStuck(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType, int32& SelectedItemAmount);
+
+	void StackDraggedItem(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType,  const EItemRotation DraggedItemRotation);
+
 #pragma endregion
 
 #pragma region SavePrimary
@@ -353,4 +394,53 @@ private:
 	void ClearAllSlotsByType(const E_SlotsType SlotsType);
 
 #pragma endregion
+
+#pragma region ControlHint
+
+private:
+	void UpdateControlHints(EInventoryStatus InStatus = EInventoryStatus::Opened);
+
+#pragma endregion
+
+#pragma region Shortcuts
+	UPROPERTY()
+	TArray<FShortcut> Shortcuts;
+
+	UPROPERTY()
+	int32 SelectedShortcut;
+
+	UFUNCTION()
+	FORCEINLINE TArray<FShortcut>& GetShortcuts() { return Shortcuts; }
+
+	UFUNCTION()
+	int32 FindItemInShortcuts(AInspectableItem* Item);
+
+	UFUNCTION()
+	void RemoveItemFromShortcut(const int32 Index);
+
+	UFUNCTION()
+	TArray<AInspectableItem*> GetAllShortcutItems();
+#pragma endregion
+
+#pragma region Sort
+public:
+	void AutoSort();
+#pragma endregion
+
+#pragma region Menu
+	UFUNCTION()
+	void CreateItemMenuWidget();
+
+	UFUNCTION()
+	void CloseItemMenuWidget(bool InPlaySound = true);
+
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UItemMenu> ItemMenuClass;
+
+	UPROPERTY()
+	UItemMenu* ItemMenuWidget;
+
+#pragma endregion
+
 };

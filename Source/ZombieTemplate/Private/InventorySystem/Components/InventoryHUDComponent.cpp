@@ -15,12 +15,16 @@
 #include "Components/CanvasPanelSlot.h"
 #include <Blueprint/WidgetLayoutLibrary.h>
 #include <Blueprint/SlateBlueprintLibrary.h>
+#include <Kismet/KismetMathLibrary.h>
+#include "InventorySystem/Widgets/ControlsHints.h"
+#include <Widgets/ItemMenu.h>
 
 void UInventoryHUDComponent::BeginPlay()
 {
     Super::BeginPlay();
 
     InitializeSlots();
+    DestroyAllTempObjects();
 
     OnDragDetected.AddDynamic(this, &ThisClass::HandleDragDetected);
     OnChangingAdditionalSlots.AddDynamic(this, &ThisClass::OnAdditionSlotsChanged);
@@ -29,7 +33,6 @@ void UInventoryHUDComponent::BeginPlay()
 void UInventoryHUDComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    if (!DragWidget) return;
     SnapDraggedItemToGridSlot(DeltaTime);
 }
 
@@ -45,6 +48,8 @@ UInventoryHUDComponent::UInventoryHUDComponent()
 void UInventoryHUDComponent::OpenInventory()
 {
     if (!InventoryWidgetClass) return;
+
+
 
     APlayerController* PC = GetPlayerController();
     if (!PC) return;
@@ -64,15 +69,22 @@ void UInventoryHUDComponent::OpenInventory()
         InventoryWidget->SetVisibility(ESlateVisibility::Visible); // 显示
         PlayInventorySound(E_InventorySoundType::Open,true);
         InventoryWidget->SetFocus();
+
+        InventoryWidget->ShowHideTempSlots(false); //隐藏网格体
+
+        DestroyAllTempObjects();
+
         FInputModeGameAndUI InputMode;
         InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
         PC->SetInputMode(InputMode);
         PC->bShowMouseCursor = true;
         PC->SetPause(true);
         SetNameAndDescriptionText(FText::GetEmpty(), FText::GetEmpty());
+        UpdateControlHints(EInventoryStatus::Opened);
         DeselectAllSlotsByType(E_SlotsType::Primary);
         DeselectAllSlotsByType(E_SlotsType::Temp);
         LoadItemWidgets();
+       
     }
 
     // 将设置鼠标位置延迟到下一帧
@@ -90,39 +102,67 @@ void UInventoryHUDComponent::OpenInventory()
 
 void UInventoryHUDComponent::CloseInventory()
 {
-    if (DragWidget) DragWidget->RemoveFromParent();
-    DragWidget = nullptr;
+    DestroyAllTempObjects();
 
-    if(HidedItemWidgetWhenDragActive) HidedItemWidgetWhenDragActive->RemoveFromParent();
-    HidedItemWidgetWhenDragActive = nullptr;
-
+    UpdateControlHints(EInventoryStatus::Closed);
     LoadPrimarySlotsFromArray();
     PlayInventorySound(E_InventorySoundType::Close,false);
 }
 
-void UInventoryHUDComponent::OnMouseButtonDown()
+void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
 {
+    if (InKey != EKeys::RightMouseButton)
+    {
+        return;
+    }
+
     if (DragWidget)
     {
         RotateItemWidget(true);
         return;
     }
 
+    if (ItemMenuWidget)
+    {
+        CloseItemMenuWidget();
+        return;
+    }
+
     if (InventoryWidget)
     {
+        InventoryWidget->ShowHideTempSlots(false);
         InventoryWidget->CloseInventory();
         CloseInventory();
         return;
     }
+
 }
 
-void UInventoryHUDComponent::OnMouseButtonUp()
+void UInventoryHUDComponent::OnMouseButtonUp(FKey InKey)
 {
-    if (DragWidget) MoveItem();
+    if (InKey == EKeys::LeftMouseButton || InKey == EKeys::SpaceBar)
+    {
+        if (DragWidget)
+        {
+            MoveItem();
+            return;
+        }
+    }
+
+    if (InKey == EKeys::LeftMouseButton)
+    {
+        if (!ItemMenuWidget)
+            {
+                CreateItemMenuWidget();
+                return;
+            }
+    }
 }
 
 void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound)
 {
+    if (ItemMenuWidget) return;
+
     if (DragWidget)
     {
         const int32 InvCol = GetInventorySize(GetRealSelectedSlot().Type).X;
@@ -173,7 +213,10 @@ void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, b
                 ItemWidgetRef = GetItemWidgetByIndex(SelectSlotIndex, SelectSlotType);
                 if (!ItemWidgetRef) return;
                 
-                SetNameAndDescriptionText(GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference->InventoryItemPayload.ItemName, GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference->InventoryItemPayload.ItemDescription);
+                SetNameAndDescriptionText(
+                    FText::FromString(GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference->InventoryItemPayload.ItemName),
+                    FText::FromString(GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference->InventoryItemPayload.ItemDescription)
+                );
                 ItemWidgetRef->SelectItemBackgroundMaterial(true,false);
                 L_Slot->SelectSlot(false);
 
@@ -316,6 +359,21 @@ void UInventoryHUDComponent::SetRealSelectedSlot(int32 InIndex, E_SlotsType InSl
     RealSelectedSlot.Type = InSlotType;
 }
 
+void UInventoryHUDComponent::DestroyAllTempObjects()
+{
+    if (DragWidget) DragWidget->RemoveFromParent();
+    DragWidget = nullptr;
+
+    if (HidedItemWidgetWhenDragActive) HidedItemWidgetWhenDragActive->RemoveFromParent();
+    HidedItemWidgetWhenDragActive = nullptr;
+
+    if (DragCancelWidget) DragCancelWidget->RemoveFromParent();
+    DragCancelWidget = nullptr;
+
+    if (ItemMenuWidget) ItemMenuWidget->RemoveFromParent();
+    ItemMenuWidget = nullptr;
+}
+
 void UInventoryHUDComponent::InitializeSlots()
 {
     InventorySlots.Empty();
@@ -331,7 +389,7 @@ void UInventoryHUDComponent::InitializeSlots()
         InventorySlots.Add(Slot);
     }
 
-    bool UseTempSlots = UInventoryStaticFunctions::GetInventoryOptions(this)->bEnableTempSlots;
+    UseTempSlots = UInventoryStaticFunctions::GetInventoryOptions(this)->bEnableTempSlots;
 
     if (UseTempSlots)
     {
@@ -507,7 +565,7 @@ bool UInventoryHUDComponent::CanAddItem(AInspectableItem* Item, const E_SlotsTyp
 {
     if (!Item) return 0;
     if (ItemAmount <= 0) return 0;
-    const int32 MaxStack = Item->InventoryItemPayload.MaxStack;
+
     TArray<FSlotStruct> Slots = GetSlots(SlotsType);
 
     TArray<int32> EmptySlots;
@@ -517,7 +575,7 @@ bool UInventoryHUDComponent::CanAddItem(AInspectableItem* Item, const E_SlotsTyp
     AInspectableItem* ItemRef = nullptr;
     if (Item->InventoryItemPayload.IsStackable)
     {
-        while (FindItemToStack(ItemRef, Slots, CanAdd,  true, MaxStack, Item->InventoryItemPayload.ItemName))
+        while (FindItemToStack(ItemRef, Slots, CanAdd, true, Item->InventoryItemPayload.ItemName))
         {
             return true;
         }
@@ -553,7 +611,7 @@ void UInventoryHUDComponent::AddItemToSlots(AInspectableItem* Item , int32 ItemA
 
     const int32 Width = Item->InventoryItemPayload.ItemIconSize.X;
     const int32 Height = Item->InventoryItemPayload.ItemIconSize.Y;
-    const int32 MaxStack = Item->InventoryItemPayload.MaxStack;
+    const int32 MaxStack = Item->InventoryItemPayload.MaxStack;  //MaxStack应该按控件里面最大堆叠来讲？
 
     TArray<int32> EmptySlots;
     EItemRotation Rotation = EItemRotation::Horizontal;
@@ -566,7 +624,7 @@ void UInventoryHUDComponent::AddItemToSlots(AInspectableItem* Item , int32 ItemA
 
         TArray<FSlotStruct> Slots = GetSlots(SlotType);
 
-        while (FindItemToStack(ItemRef, Slots, CanAdd, true, MaxStack, Item->InventoryItemPayload.ItemName))
+        while (FindItemToStack(ItemRef, Slots, CanAdd, true, Item->InventoryItemPayload.ItemName))
         {
             if (CanAdd >= ItemAmount)
             {
@@ -607,17 +665,17 @@ void UInventoryHUDComponent::AddItemToSlots(AInspectableItem* Item , int32 ItemA
 
 }
 
-bool UInventoryHUDComponent::FindItemToStack(AInspectableItem*& Item, const TArray<FSlotStruct>& Slots, int32& CanAdd, bool IsStackable, const int32 MaxStack, const FText ItemName)
+bool UInventoryHUDComponent::FindItemToStack(AInspectableItem*& Item, const TArray<FSlotStruct>& Slots, int32& CanAdd, bool IsStackable, const FString ItemName)
 {
     if (IsStackable)
     {
         for (const FSlotStruct& Slot : Slots)
         {
-            if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName.EqualTo(ItemName))
+            if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
             {
-                if (Slot.ItemReference->InventoryItemPayload.ItemAmount < MaxStack)
+                if (Slot.ItemReference->InventoryItemPayload.ItemAmount < Slot.ItemReference->InventoryItemPayload.MaxStack)
                 {
-                    CanAdd = MaxStack - Slot.ItemReference->InventoryItemPayload.ItemAmount;
+                    CanAdd = Slot.ItemReference->InventoryItemPayload.MaxStack - Slot.ItemReference->InventoryItemPayload.ItemAmount;
                     Item = Slot.ItemReference;
                     return true;
                 }
@@ -637,7 +695,7 @@ void UInventoryHUDComponent::SetItemAmount(AInspectableItem* Item, const int32 A
 
         if (Item->InventoryItemPayload.OccupiedSlots.IsValidIndex(0))
         {
-            const int32 Index = Item->InventoryItemPayload.OccupiedSlots.IsValidIndex(0);
+            const int32 Index = Item->InventoryItemPayload.OccupiedSlots[0];
             const E_SlotsType SlotsType = Item->InventoryItemPayload.SlotsType;
 
             UItemWidget* ItemWidget = GetItemWidgetByIndex(Index, SlotsType);
@@ -645,6 +703,7 @@ void UInventoryHUDComponent::SetItemAmount(AInspectableItem* Item, const int32 A
             // 设置数量
             ItemWidget->InventoryItemPayload.ItemAmount = Amount;
             ItemWidget->SetAmount();
+
         }
     }
 }
@@ -698,6 +757,7 @@ void UInventoryHUDComponent::RemoveItemsInSlot(const int32 SlotIndex, const E_Sl
             return; // true;
         }
         SetItemAmount(Item, TempAmount);
+        
     }
     return;
 }
@@ -905,28 +965,106 @@ void UInventoryHUDComponent::InitializeDragWidget()
 
 void UInventoryHUDComponent::SnapDraggedItemToGridSlot(float InDeltaTime)
 {
-    if (!DragWidget) return;
-    UInventorySlotWidget* Slot = GetSlotWidgetByIndex(SelectSlotIndex, SelectSlotType);
+    if (DragWidget)
+    {
+        UInventorySlotWidget* Slot = GetSlotWidgetByIndex(SelectSlotIndex, SelectSlotType);
 
-    if (!Slot) return;
-    UCanvasPanelSlot* DragWidgetSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(DragWidget);
-    if (!DragWidgetSlot) return;
+        if (!Slot) return;
+        UCanvasPanelSlot* DragWidgetSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(DragWidget);
+        if (!DragWidgetSlot) return;
 
-    FGeometry CachedGeometry = Slot->GetCachedGeometry();
-    FVector2D ViewportPos;
-    FVector2D PixelPosition;
-    USlateBlueprintLibrary::LocalToViewport(
-        this,
-        CachedGeometry,
-        FVector2D::ZeroVector,
-        PixelPosition,
-        ViewportPos
-    );
-    FVector2D CurrentPos = DragWidgetSlot->GetPosition();
-    float InterpSpeed = 22.0f;
-    FVector2D NewPos = FMath::Vector2DInterpTo(CurrentPos, ViewportPos, InDeltaTime, InterpSpeed);
+        FGeometry CachedGeometry = Slot->GetCachedGeometry();
+        FVector2D ViewportPos;
+        FVector2D PixelPosition;
+        USlateBlueprintLibrary::LocalToViewport(
+            this,
+            CachedGeometry,
+            FVector2D::ZeroVector,
+            PixelPosition,
+            ViewportPos
+        );
+        FVector2D CurrentPos = DragWidgetSlot->GetPosition();
+        float InterpSpeed = 22.0f;
+        FVector2D NewPos = FMath::Vector2DInterpTo(CurrentPos, ViewportPos, InDeltaTime, InterpSpeed);
 
-    DragWidgetSlot->SetPosition(NewPos);
+        DragWidgetSlot->SetPosition(NewPos);
+
+        return;
+    }
+    else if (DragCancelWidget)
+    {
+        // 当拖拽取消时，将物品动画移回原槽位
+        UCanvasPanelSlot* PanelSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(DragCancelWidget);
+        if (!PanelSlot) return;
+
+        const int32 FirstIndex = DragCancelWidget->GetFirstOccupiedSlotIndex();
+        const E_SlotsType SlotType = DragCancelWidget->InventoryItemPayload.SlotsType;
+
+        UInventorySlotWidget* TargetSlot = GetSlotWidgetByIndex(FirstIndex, SlotType);
+        if (!TargetSlot) return;
+
+        // 获取当前物品位置
+        FVector2D CurrentPos, CurrentPixelPos;
+        USlateBlueprintLibrary::LocalToViewport(
+            this,
+            DragCancelWidget->GetCachedGeometry(),
+            FVector2D::ZeroVector,
+            CurrentPixelPos,
+            CurrentPos
+        );
+
+        // 计算目标位置的偏移（用于旋转修正）
+        UInventoryData* InventoryData = UInventoryStaticFunctions::GetInventoryOptions(this);
+        if (!InventoryData) return;
+
+        const int32 SlotSize = InventoryData->SlotSize;
+        const FIntPoint IconSize = DragCancelWidget->InventoryItemPayload.ItemIconSize;
+        const int32 OffsetAmount = (SlotSize / 2) * (IconSize.X - IconSize.Y);
+
+        const bool bIsDefaultHorizontal = (DragCancelWidget->DefaultRotation == EItemRotation::Horizontal);
+        const FVector2D LocalOffset = FVector2D(
+            bIsDefaultHorizontal ? OffsetAmount : -OffsetAmount,
+            bIsDefaultHorizontal ? -OffsetAmount : OffsetAmount
+        );
+
+        // 获取目标位置（如果当前旋转与默认一致，无需偏移）
+        FVector2D TargetPos, TargetPixelPos;
+        const FVector2D& LocalCoordinate = (DragCancelWidget->Rotation == DragCancelWidget->DefaultRotation)
+            ? FVector2D::ZeroVector
+            : LocalOffset;
+
+        USlateBlueprintLibrary::LocalToViewport(
+            this,
+            TargetSlot->GetCachedGeometry(),
+            LocalCoordinate,
+            TargetPixelPos,
+            TargetPos
+        );
+
+        // 插值移动到目标位置
+        const float InterpSpeed = 30.0f;
+        const float SnapDistance = 1.0f;
+
+        FVector2D NewPos = FMath::Vector2DInterpTo(CurrentPos, TargetPos, InDeltaTime, InterpSpeed);
+        PanelSlot->SetPosition(NewPos);
+
+        // 到达目标位置时，完成回位
+        if ((TargetPos - NewPos).SizeSquared() <= SnapDistance * SnapDistance)
+        {
+            DragCancelWidget->RemoveFromParent();
+            DragCancelWidget = nullptr;
+
+            // 如果没有拖拽中的物品，恢复被隐藏的物品
+            if (!DragWidget)
+            {
+                EndBackItemWidgetToSlots();
+            }
+        }
+
+    }
+
+    else return;
+
 }
 
 void UInventoryHUDComponent::ApplyOffset(int32& InIndex)
@@ -1130,6 +1268,52 @@ void UInventoryHUDComponent::RotateItemWidget(bool InPlaySound)
 
 }
 
+void UInventoryHUDComponent::CancelDrag(bool InPlaySound)
+{
+    if (IsValidSwappedItem())
+    {
+        PlayInventorySound(E_InventorySoundType::UnableToPlaceDraggableItemInSlots, true);
+        return;
+    }
+
+    if (DragCancelWidget)
+    {
+        DragCancelWidget->RemoveFromParent();
+        EndBackItemWidgetToSlots();
+    }
+
+    PlayInventorySound(E_InventorySoundType::DragCanceled,InPlaySound);
+
+    if (DragWidget)
+    {
+        DragWidget->SetActiveBackgroundMaterial(false);
+        DragWidget->SelectItemBackgroundMaterial(false, false);
+        DragWidget->PlayRotationToDefaultAnimation();
+        DragWidget->HideInfoOverlayAnimation();
+
+        FSlotInfo SlotInfo;
+        SlotInfo.Index = DragWidget->GetFirstOccupiedSlotIndex();
+        SlotInfo.Type = DragWidget->InventoryItemPayload.SlotsType;
+
+        if (HidedItemWidgetWhenDragActive)
+        {
+            HidedItemWidgetWhenDragActive->SelectItemBackgroundMaterial(true, false);
+        }
+
+        DragCancelWidget = DragWidget;
+        DragWidget = nullptr;
+
+        //RefreshControlsHintsWidget
+        UpdateControlHints(EInventoryStatus::Opened);
+
+        SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+
+    }
+       
+
+
+}
+
 
 void UInventoryHUDComponent::HandleDragDetected()
 {
@@ -1143,10 +1327,21 @@ void UInventoryHUDComponent::HandleDragDetected()
     UItemWidget* ItemWidget = GetItemWidgetByIndex(SlotInfo.Index, SlotInfo.Type);
     if (!ItemWidget) return;
 
+    
     PlayInventorySound(E_InventorySoundType::OnDragStart,true);
     InitializeDragWidget();
+
+    if (!IsSlotsHaveItems(E_SlotsType::Temp) && InventoryWidget && InventoryWidget->WB_Temp && UseTempSlots)
+    {
+        if (!DragWidget) return;
+        InventoryWidget->ShowHideTempAnim(true);
+    }
+
+    CloseItemMenuWidget(false);
     DeselectAllSlotsByType(SelectSlotType);
     SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+    UpdateControlHints(EInventoryStatus::Draged);
+
 
 }
 
@@ -1204,8 +1399,15 @@ void UInventoryHUDComponent::MoveItem()
     TArray<int32> EmptySlots;
     const int32 FirstOccupiedSlotIndex = DragWidget->GetFirstOccupiedSlotIndex();
     E_SlotsType SlotType = DragWidget->InventoryItemPayload.SlotsType;
+    const EItemRotation Rotation = DragWidget->Rotation;
+    const FIntPoint ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
+    FSlotInfo SelectedSlotInfo;
+    SelectedSlotInfo.Index = SelectSlotIndex;
+    SelectedSlotInfo.Type = SelectSlotType;
 
-    bool IsEmptySpace = CanItemAddedToSlots(FirstOccupiedSlotIndex, SlotType, DragWidget->Rotation, SelectSlotIndex, SelectSlotType, EmptySlots);
+
+
+    bool IsEmptySpace = CanItemAddedToSlots(FirstOccupiedSlotIndex, SlotType, Rotation, SelectSlotIndex, SelectSlotType, EmptySlots);
     if (IsEmptySpace)
     {
         PlayInventorySound(E_InventorySoundType::OnDragEnd,true);
@@ -1225,32 +1427,46 @@ void UInventoryHUDComponent::MoveItem()
         DragWidget = nullptr;
         
         //其他比图说controls hints widget;
- 
+        UpdateControlHints(EInventoryStatus::Opened);
 
 
         return;
     }
+    else if (CanStackDraggedItem(SelectSlotIndex, SelectSlotType, FirstOccupiedSlotIndex, SlotType, Rotation))
+    {
+        UItemWidget* ItemWidget = GetItemWidgetByIndex(SelectSlotIndex, SelectSlotType);
+        if (!ItemWidget) return;
+        const int32 Amount = DragWidget->InventoryItemPayload.ItemAmount = CalculateItemAmountAfterStuck(SelectSlotIndex, SelectSlotType, FirstOccupiedSlotIndex, SlotType, ItemWidget->InventoryItemPayload.ItemAmount);
+        StackDraggedItem(SelectSlotIndex, SelectSlotType, FirstOccupiedSlotIndex, SlotType, Rotation);
+        if (Amount <= 0)
+        {
+            if (IsValid(DragWidget)) DragWidget->RemoveFromParent();
+            DragWidget = nullptr;
+            SelectSlot(SelectSlotIndex, SelectSlotType, false);
+            PlayInventorySound(E_InventorySoundType::OnDragEnd, true);
+            UpdateControlHints(EInventoryStatus::Opened);
+            OnChangingAdditionalSlots.Broadcast();
+            return;
+        }
+        else
+        {
+            PlayInventorySound(E_InventorySoundType::OnDragEnd, true);
+            return;
+        }
 
-     AInspectableItem* ItemUnderDragItem = nullptr;
+    }
 
-     const int32 L_FirstSlotsIndex = DragWidget->GetFirstOccupiedSlotIndex();
-     const E_SlotsType L_SlotsType = DragWidget->InventoryItemPayload.SlotsType;
-     const EItemRotation L_Rotation = DragWidget->Rotation;
-     const FIntPoint L_ItemSize = DragWidget->InventoryItemPayload.ItemIconSize;
-     FSlotInfo SelectedSlotInfo;
-     SelectedSlotInfo.Index = SelectSlotIndex;
-     SelectedSlotInfo.Type = SelectSlotType;
+    AInspectableItem* ItemUnderDragItem = nullptr;
 
-    if (CanSwapDraggedItem(L_FirstSlotsIndex, L_SlotsType, SelectSlotIndex, SelectSlotType, L_Rotation, ItemUnderDragItem))
+    if (CanSwapDraggedItem(FirstOccupiedSlotIndex, SlotType, SelectSlotIndex, SelectSlotType, Rotation, ItemUnderDragItem))
     {
 
         CreateSwapItemWidget(ItemUnderDragItem);
-        SwapDraggedItem(L_FirstSlotsIndex, L_SlotsType, SelectedSlotInfo.Index, SelectedSlotInfo.Type, L_Rotation, L_ItemSize);
+        SwapDraggedItem(FirstOccupiedSlotIndex, SlotType, SelectedSlotInfo.Index, SelectedSlotInfo.Type, Rotation, ItemSize);
         return;
     }
-    //交换一个垂直东西会有问题 注意修改
 
-
+    CancelDrag(true);
 
 }
 
@@ -1312,10 +1528,10 @@ void UInventoryHUDComponent::CreateSwapItemWidget(AInspectableItem* ItemUnderDra
 
     DragWidget = NewItemWidget;
 
+    UpdateControlHints(EInventoryStatus::Draged);
     //InitializeDragWidgetForSwappedItem Finish
 
 }
-
 
 void UInventoryHUDComponent::AddExistingItemToSlots(AInspectableItem* Item, const E_SlotsType SlotsType, const EItemRotation Rotation, const TArray<int32>& EmptySlots)
 {
@@ -1407,8 +1623,6 @@ bool UInventoryHUDComponent::CanSwapDraggedItem(const int32 ItemToIgnoreSlotInde
 
 }
 
-
-
 void UInventoryHUDComponent::SwapDraggedItem(const int32 ItemIndex, const E_SlotsType SlotsType, const int32 SelectedIndex, const E_SlotsType SelectedSlotsType, const EItemRotation DraggedItemRotation, FIntPoint ItemSize)
 {
     //传入 是先前拖拽数据
@@ -1484,11 +1698,123 @@ bool UInventoryHUDComponent::IsValidSwappedItem() const
     return false;
 }
 
+bool UInventoryHUDComponent::CanStackDraggedItem(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType, const EItemRotation DraggedItemRotation)
+{
+    AInspectableItem* SelectedItem = nullptr;
+    if (!GetItemInSlot(SelectedSlotIndex, SelectedSlotType, SelectedItem)) return false;
+    if (!SelectedItem->InventoryItemPayload.OccupiedSlots.IsValidIndex(0)) return false;
+    if (SelectedItem->InventoryItemPayload.OccupiedSlots[0] != SelectedSlotIndex) return false;
+
+    AInspectableItem* DraggedItem = nullptr;
+    if (!GetItemInSlot(DraggedItemSlotIndex, DraggedItemSlotType, DraggedItem)) return false;
+
+    if (!IsValid(SelectedItem) || !IsValid(DraggedItem)) return false;
+
+    if ((SelectedItem->InventoryItemPayload.ItemName == DraggedItem->InventoryItemPayload.ItemName) && (SelectedItem != DraggedItem))
+    {
+        if (SelectedItem->InventoryItemPayload.IsStackable)
+        {
+            const int32 MaxStack = SelectedItem->InventoryItemPayload.MaxStack;
+            if (SelectedItem->InventoryItemPayload.ItemAmount >= MaxStack) return false;
+            const int32 CanAdd = MaxStack - SelectedItem->InventoryItemPayload.ItemAmount;
+            if (CanAdd <= 0) return false;
+            return true;
+        }
+    }
+    return false;
+}
+
+int32 UInventoryHUDComponent::CalculateItemAmountAfterStuck(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType, int32& SelectedItemAmount)
+{
+    SelectedItemAmount = 0;
+    AInspectableItem* SelectedItem = nullptr;
+    if (!GetItemInSlot(SelectedSlotIndex, SelectedSlotType, SelectedItem)) return 0;
+
+    AInspectableItem* DraggedItem = nullptr;
+    if (!GetItemInSlot(DraggedItemSlotIndex, DraggedItemSlotType, DraggedItem)) return 0;
+
+    if (!IsValid(SelectedItem) || !IsValid(DraggedItem)) return 0;
+
+    if ((SelectedItem->InventoryItemPayload.ItemName == DraggedItem->InventoryItemPayload.ItemName) && (SelectedItem != DraggedItem))
+    {
+        if (SelectedItem->InventoryItemPayload.IsStackable)
+        {
+            const int32 MaxStack = SelectedItem->InventoryItemPayload.MaxStack;
+            const int32 CanAdd = MaxStack - SelectedItem->InventoryItemPayload.ItemAmount;
+            const int32 DraggedItemAmount = DraggedItem->InventoryItemPayload.ItemAmount;
+            if (DraggedItemAmount >= CanAdd)
+            {
+                SelectedItemAmount = SelectedItem->InventoryItemPayload.ItemAmount + CanAdd;
+                return DraggedItemAmount - CanAdd;
+            }
+            else
+            {
+                SelectedItemAmount = SelectedItem->InventoryItemPayload.ItemAmount + DraggedItem->InventoryItemPayload.ItemAmount;
+                return 0;
+            }
+        };
+    }
+
+    return 0;
+}
+
+void UInventoryHUDComponent::StackDraggedItem(const int32 SelectedSlotIndex, const E_SlotsType SelectedSlotType, const int32 DraggedItemSlotIndex, const E_SlotsType DraggedItemSlotType, const EItemRotation DraggedItemRotation)
+{
+    if (!CanStackDraggedItem(SelectedSlotIndex, SelectedSlotType, DraggedItemSlotIndex, DraggedItemSlotType,
+        DraggedItemRotation))
+        return;
+
+    AInspectableItem* SelectedItem;
+    if (!GetItemInSlot(SelectedSlotIndex, SelectedSlotType, SelectedItem)) return;
+
+    AInspectableItem* DraggedItem;
+    if (!GetItemInSlot(DraggedItemSlotIndex, DraggedItemSlotType, DraggedItem)) return;
+
+    if (!IsValid(SelectedItem) || !IsValid(DraggedItem)) return;
+
+    if ((SelectedItem->InventoryItemPayload.ItemName == DraggedItem->InventoryItemPayload.ItemName) && (SelectedItem != DraggedItem))
+    {
+        if (SelectedItem->InventoryItemPayload.IsStackable)
+        {
+            const int32 MaxStack = SelectedItem->InventoryItemPayload.MaxStack;
+            const int32 CanAdd = MaxStack - SelectedItem->InventoryItemPayload.ItemAmount;
+            const int32 DraggedItemAmount = DraggedItem->InventoryItemPayload.ItemAmount;
+            if (DraggedItemAmount >= CanAdd)
+            {
+                SetItemAmount(SelectedItem, SelectedItem->InventoryItemPayload.ItemAmount + CanAdd);
+                RemoveItemByRef(DraggedItem, CanAdd, false);
+               
+                if (DragWidget)
+                {
+                    DragWidget->InventoryItemPayload.ItemAmount = DraggedItem->InventoryItemPayload.ItemAmount;
+                    DragWidget->SetAmount(); //拖拽同步
+                }
+
+                return;
+            }
+            else
+            {
+                SetItemAmount(SelectedItem, SelectedItem->InventoryItemPayload.ItemAmount + DraggedItem->InventoryItemPayload.ItemAmount);
+                RemoveItemByRef(DraggedItem, 1, true);
+
+                return;
+            }
+        };
+    }
+
+
+}
+
 void UInventoryHUDComponent::OnAdditionSlotsChanged()
 {
     if ((!IsSlotsHaveItems(E_SlotsType::Temp)))
     {
         if (!IsValidSwappedItem())	SavePrimarySlotsInArray();
+    }
+
+    if (!IsSlotsHaveItems(E_SlotsType::Temp) && !IsValidSwappedItem() && InventoryWidget && InventoryWidget->WB_Temp && UseTempSlots)
+    {
+        InventoryWidget->ShowHideTempAnim(false);
     }
 }
 
@@ -1570,6 +1896,245 @@ void UInventoryHUDComponent::ClearAllSlotsByType(const E_SlotsType SlotsType)
             Item->RemoveFromParent();
             ItemsWidgets.RemoveAt(i);
         }
+    }
+}
+
+void UInventoryHUDComponent::UpdateControlHints(EInventoryStatus InStatus)
+{
+    if (InventoryWidget && InventoryWidget->WB_ControlHints)
+    {
+        if (DragWidget)
+        {
+            InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::Draged);
+            return;
+        }
+
+        if (IsSlotsHaveItems(E_SlotsType::Temp) && !DragWidget && !IsValidSwappedItem())
+        {
+            InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::HasItemInTemp);
+            return;
+        }
+
+        if (ItemMenuWidget)
+        {
+            InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::Menu);
+            return;
+        }
+   
+        InventoryWidget->WB_ControlHints->UpdateControlHint(InStatus);
+        return;
+    }
+}
+
+int32 UInventoryHUDComponent::FindItemInShortcuts(AInspectableItem* Item)
+{
+    if (!IsValid(Item)) return -1;
+    for (FShortcut const& Shortcut : GetShortcuts())
+    {
+        if (Shortcut.Item == Item)
+            return Shortcut.Index;
+    }
+    return -1;
+}
+
+void UInventoryHUDComponent::RemoveItemFromShortcut(const int32 Index)
+{
+    for (FShortcut& Shortcut : Shortcuts)
+    {
+        if (Shortcut.Index == Index)
+        {
+            Shortcut.Item = nullptr;
+            Shortcut.IsEmpty = true;
+            //Delegates_OnShortcutsChanged.Broadcast(GetAllShortcutItems()); //注意！！！
+            return;
+        }
+    }
+}
+
+TArray<AInspectableItem*> UInventoryHUDComponent::GetAllShortcutItems()
+{
+    TArray<AInspectableItem*> ItemsInShortcuts;
+    for (FShortcut const& ShortcutSlot : GetShortcuts())
+    {
+        if (ShortcutSlot.IsEmpty || !IsValid(ShortcutSlot.Item)) continue;
+        ItemsInShortcuts.Add(ShortcutSlot.Item);
+    }
+    return ItemsInShortcuts;
+}
+
+void UInventoryHUDComponent::AutoSort()
+{
+    if (DragWidget) return;
+    if (IsSlotsHaveItems(E_SlotsType::Temp)) return;
+    TArray<AInspectableItem*> Items;
+
+    // 第一步：收集所有有效Item（仅收集，不修改）
+    for (FSlotStruct const& Slot : GetSlots(E_SlotsType::Primary))
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference))
+        {
+            Items.Add(Slot.ItemReference);
+        }
+    }
+
+    //避免重复合并 + 标记要移除的Item（改用索引遍历，跳过已处理 / 已标记的Item）
+     TArray<AInspectableItem*> RemovedItems;
+     // 外层用索引，方便跳过已处理的Item
+     for (int32 i = 0; i < Items.Num(); ++i)
+     {
+         AInspectableItem* Item_1 = Items[i];
+         // 跳过已标记删除、不可堆叠、已达最大堆叠的Item
+         if (!IsValid(Item_1) || RemovedItems.Contains(Item_1) || !Item_1->InventoryItemPayload.IsStackable || Item_1->InventoryItemPayload.ItemAmount >= Item_1->InventoryItemPayload.MaxStack)
+         {
+             continue;
+         }
+
+         // 内层从i+1开始，避免重复处理（Item1和Item2互刷）
+         for (int32 j = i + 1; j < Items.Num(); ++j)
+         {
+             AInspectableItem* Item_2 = Items[j];
+             // 跳过无效、已标记删除、类型不同、不可堆叠、自身的Item
+             if (!IsValid(Item_2) || RemovedItems.Contains(Item_2) || Item_1 == Item_2 ||
+                 Item_1->InventoryItemPayload.ItemName != Item_2->InventoryItemPayload.ItemName || !Item_2->InventoryItemPayload.IsStackable)
+             {
+                 continue;
+             }
+
+             const int32 MaxStack = Item_1->InventoryItemPayload.MaxStack;
+             const int32 CanAdd = MaxStack - Item_1->InventoryItemPayload.ItemAmount;
+             // Item1已堆满，直接退出内层循环（无需继续合并）
+             if (CanAdd <= 0) break;
+
+             // 合并逻辑
+             if (Item_2->InventoryItemPayload.ItemAmount >= CanAdd)
+             {
+                 Item_1->InventoryItemPayload.ItemAmount += CanAdd;
+                 Item_2->InventoryItemPayload.ItemAmount -= CanAdd;
+             }
+             else
+             {
+                 Item_1->InventoryItemPayload.ItemAmount += Item_2->InventoryItemPayload.ItemAmount;
+                 Item_2->InventoryItemPayload.ItemAmount = 0;
+             }
+
+             //仅当Item2的数量真的<=0时，才标记删除（加安全校验）
+             if (IsValid(Item_2) && Item_2->InventoryItemPayload.ItemAmount <= 0 && !RemovedItems.Contains(Item_2))
+             {
+                 RemovedItems.Add(Item_2);
+                 const int32 ShortcutIndex = FindItemInShortcuts(Item_2);
+                 if (Shortcuts.IsValidIndex(ShortcutIndex))
+                 {
+                     if (FindItemInShortcuts(Item_1) == INDEX_NONE)
+                     {
+                         Shortcuts[ShortcutIndex].Item = Item_1;
+                     }
+                     else
+                     {
+                         RemoveItemFromShortcut(ShortcutIndex);
+                     }
+                 }
+             }
+
+         }
+     }
+
+     //移除标记为删除的Item（加非空校验）
+     Items.RemoveAll([&](AInspectableItem* Item)
+         {
+             return !IsValid(Item) || RemovedItems.Contains(Item) || Item->InventoryItemPayload.ItemAmount <= 0;
+         });
+
+     // 排序逻辑
+     Items.Sort([](const AInspectableItem& A, const AInspectableItem& B)
+         {
+             return (A.InventoryItemPayload.ItemIconSize.X * A.InventoryItemPayload.ItemIconSize.Y)
+         > (B.InventoryItemPayload.ItemIconSize.X * B.InventoryItemPayload.ItemIconSize.Y);
+         });
+
+     // 清空所有槽位（保留Item对象，仅清空槽位引用）
+     ClearAllSlotsByType(E_SlotsType::Primary);
+
+     PlayInventorySound(E_InventorySoundType::Autosort);
+
+     //重新添加Item时，加严格的有效性校验，避免添加空/无效Item
+     for (AInspectableItem* const& Item : Items)
+     {
+         // 双重校验：Item有效 + 数量>0（核心：避免添加空Item）
+         if (!IsValid(Item) || Item->InventoryItemPayload.ItemAmount <= 0)
+         {
+             continue;
+         }
+
+         TArray<int32> EmptySlots;
+         EItemRotation Rotation;
+         // 确保能找到空槽位后再添加
+         if (FindEmptySlots(E_SlotsType::Primary, Item->InventoryItemPayload.ItemIconSize.X, Item->InventoryItemPayload.ItemIconSize.Y, Rotation, EmptySlots, TArray<int32>()))
+         {
+             AddExistingItemToSlots(Item, E_SlotsType::Primary, Rotation, EmptySlots);
+         }
+     }
+}
+
+void UInventoryHUDComponent::CreateItemMenuWidget()
+{
+    if (IsSlotsHaveItems(E_SlotsType::Temp) || IsValidSwappedItem()) return;
+   
+    AInspectableItem* SelectItem = nullptr;
+
+    if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
+    {
+        SelectItem = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+    }
+    if (!SelectItem) return;
+
+    if (!ItemMenuClass) return;
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+    UItemMenu* ItemMenu = CreateWidget<UItemMenu>(PC, ItemMenuClass);
+    if (!ItemMenu) return;
+    ItemMenu->InitMenuButtonVisibility(
+        SelectItem->InventoryItemPayload.bUseEnabled,
+        SelectItem->InventoryItemPayload.bShortcutEnabled,
+        SelectItem->InventoryItemPayload.bInspectEnabled,
+        SelectItem->InventoryItemPayload.bCombineEnabled,
+        SelectItem->InventoryItemPayload.bDiscardEnabled,
+        SelectItem->InventoryItemPayload.bSplitEnabled,
+        SelectItem->InventoryItemPayload.bEquipEnabled,
+        SelectItem->InventoryItemPayload.bAttachAttachmentEnabled,
+        SelectItem->InventoryItemPayload.bDetachAttachmentEnabled
+    );
+    
+    if (!InventoryWidget || !InventoryWidget->CanvasPanel_Root) return;
+    UCanvasPanelSlot* Slot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(ItemMenu);
+    Slot->SetAutoSize(true);
+
+    UItemWidget* ItemWidget = GetItemWidgetByIndex(SelectSlotIndex, SelectSlotType);
+    if (!ItemWidget) return;
+    ItemWidget->SelectItemBackgroundMaterial(false,true);
+
+    FGeometry CachedGeometry = ItemWidget->GetCachedGeometry();
+    FVector2D PixelPosition;
+    FVector2D ViewportPosition;
+
+    USlateBlueprintLibrary::LocalToViewport(this ,CachedGeometry, FVector2D(CachedGeometry.GetLocalSize().X, 0), PixelPosition, ViewportPosition);
+    Slot->SetPosition(ViewportPosition);
+
+    ItemMenuWidget = ItemMenu;
+
+    UpdateControlHints(EInventoryStatus::Menu);
+    PlayInventorySound(E_InventorySoundType::OpenMenu);
+
+}
+
+void UInventoryHUDComponent::CloseItemMenuWidget(bool InPlaySound)
+{
+    if (ItemMenuWidget)
+    {
+        ItemMenuWidget->RemoveFromParent();
+        ItemMenuWidget = nullptr;
+        UpdateControlHints(EInventoryStatus::Opened);
+        SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+        PlayInventorySound(InPlaySound ? E_InventorySoundType::CloseMenu : E_InventorySoundType::None);
     }
 }
 

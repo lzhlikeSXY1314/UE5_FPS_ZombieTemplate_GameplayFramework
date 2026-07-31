@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "InputCoreTypes.h"
 #include "InventoryWidget.generated.h"
+
 
 
 class UInventoryGridPanelWidget;
@@ -12,6 +14,7 @@ class UTextBlock;
 class UImage;
 class UNameAndDecription;
 class UCanvasPanel;
+class UControlsHints;
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryWidget : public UUserWidget
@@ -39,6 +42,9 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UInventoryGridPanelWidget> WB_Temp;
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UControlsHints> WB_ControlHints;
+
 	// 绑定物品信息面板
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UNameAndDecription> WB_ItemInfo;
@@ -58,6 +64,12 @@ public:
 
 	void CloseInventory();
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
+	void ShowHideTempAnim(bool ShowTemp);
+	virtual void ShowHideTempAnim_Implementation(bool ShowTemp);
+
+	UFUNCTION(BlueprintCallable)
+	void ShowHideTempSlots(bool Show = false);
 
 
 private:
@@ -65,8 +77,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TArray<FKey> CloseInventoryKeys;
 
-	void OnMouseButtonDown();
+	void OnMouseButtonDown(FKey InKey);
 
-	void OnMouseButtonUp();
+	void OnMouseButtonUp(FKey InKey);
+
+
 
 };

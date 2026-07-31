@@ -104,14 +104,15 @@ void UItemWidget::LoadBulletIconAsync()
 
 void UItemWidget::SetAmount()
 {
-    if (!Amount_Text) return;
+    //if (!Amount_Text) return;
     if (InventoryItemPayload.IsWeapon)
     {
-        Amount_Text->SetText(FText::AsNumber(InventoryItemPayload.AmmoAmount));
+        OnAmountChange.Broadcast(InventoryItemPayload.AmmoAmount);
         return;
     }
     if(BulletImage) BulletImage->SetVisibility(ESlateVisibility::Hidden);
-    Amount_Text->SetText(FText::AsNumber(InventoryItemPayload.ItemAmount));
+
+    OnAmountChange.Broadcast(InventoryItemPayload.ItemAmount);
 }
 
 void UItemWidget::SetActiveBackgroundMaterial(bool InActive)
@@ -146,6 +147,14 @@ void UItemWidget::PlayRotationAnimation_Implementation(EItemRotation InRotation)
         CachedMaterial->SetScalarParameterValue(FName("Angle"), Angle);
     }
 
+}
+
+void UItemWidget::PlayRotationToDefaultAnimation_Implementation()
+{
+}
+
+void UItemWidget::HideInfoOverlayAnimation_Implementation()
+{
 }
 
 void UItemWidget::SetItemWidgetAspectRatio()

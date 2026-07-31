@@ -19,11 +19,46 @@ void UInventoryWidget::NativeConstruct()
 FReply UInventoryWidget::NativeOnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
     const FKey PressedKey = InKeyEvent.GetKey();
+
+    if (InKeyEvent.IsRepeat())
+    {
+        return FReply::Handled();
+    }
+
     if (CloseInventoryKeys.Contains(PressedKey))
     {
         CloseInventory();
         return FReply::Handled();
     }
+
+    if (PressedKey == EKeys::SpaceBar)
+    {
+        OnMouseButtonUp(PressedKey);
+        return FReply::Handled();
+    }
+
+    if (PressedKey == EKeys::LeftShift || PressedKey == EKeys::RightShift)
+    {
+        UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+        if (HUDComp)
+        {
+            HUDComp->OnDragDetected.Broadcast();
+        }
+        return FReply::Handled();
+    }
+
+
+    if (PressedKey == EKeys::LeftAlt || PressedKey == EKeys::RightAlt)
+    {
+        UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+        if (HUDComp)
+        {
+            HUDComp->AutoSort();
+        }
+        return FReply::Handled();
+    }
+
+
     return Super::NativeOnKeyDown(MyGeometry, InKeyEvent);
 }
 
@@ -31,7 +66,7 @@ FReply UInventoryWidget::NativeOnMouseButtonDown(const FGeometry& MyGeometry, co
 {
     if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
     {
-        OnMouseButtonDown();
+        OnMouseButtonDown(EKeys::RightMouseButton);
         return FReply::Handled();
     }
 
@@ -42,7 +77,7 @@ FReply UInventoryWidget::NativeOnMouseButtonUp(const FGeometry& MyGeometry, cons
 {
     if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
     {
-        OnMouseButtonUp();
+        OnMouseButtonUp(EKeys::LeftMouseButton);
         return FReply::Handled();
     }
 
@@ -84,22 +119,35 @@ void UInventoryWidget::CloseInventory()
 
 }
 
-void UInventoryWidget::OnMouseButtonDown()
+void UInventoryWidget::ShowHideTempAnim_Implementation(bool ShowTemp)
+{
+}
+
+void UInventoryWidget::ShowHideTempSlots(bool Show)
+{
+    if (WB_Temp)
+    {
+        WB_Temp->SetVisibility(Show ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+    }
+}
+
+
+void UInventoryWidget::OnMouseButtonDown(FKey InKey)
 {
 
     UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
     if (HUDComp)
     {
-        HUDComp->OnMouseButtonDown();
+        HUDComp->OnMouseButtonDown(InKey);
     }
 
 }
 
-void UInventoryWidget::OnMouseButtonUp()
+void UInventoryWidget::OnMouseButtonUp(FKey InKey)
 {
     UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
     if (HUDComp)
     {
-        HUDComp->OnMouseButtonUp();
+        HUDComp->OnMouseButtonUp(InKey);
     }
 }
