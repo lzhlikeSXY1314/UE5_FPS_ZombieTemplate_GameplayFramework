@@ -97,8 +97,6 @@ void UZombieSaveManager::PopulateSaveData(UZombieSaveGame* SaveData, APlayerCont
         SaveData->PlayerLocation = Player->GetActorLocation();
         SaveData->PlayerRotation = Player->GetActorRotation();
         SaveData->PlayerHealth = Player->CurrentHealth; // 假设 AZombiePlayer 中有 CurrentHealth
-        SaveData->ReserveAmmo = Player->ReserveAmmo;
-
 
         // 记录装备武器的 ID
         if (Player->GetCurrentWeapon() && Player->GetCurrentWeapon()->Implements<USaveableActor>())
@@ -269,7 +267,6 @@ void UZombieSaveManager::ApplySaveData(const UZombieSaveGame* SaveData, APlayerC
         Player->SetActorLocation(SaveData->PlayerLocation);
         Player->SetActorRotation(SaveData->PlayerRotation);
         Player->CurrentHealth = SaveData->PlayerHealth;
-        Player->ReserveAmmo = SaveData->ReserveAmmo;
     }
 
     // 关卡校验

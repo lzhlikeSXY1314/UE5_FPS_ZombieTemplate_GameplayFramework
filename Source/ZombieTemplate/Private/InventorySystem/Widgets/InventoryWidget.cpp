@@ -64,13 +64,10 @@ FReply UInventoryWidget::NativeOnKeyDown(const FGeometry& MyGeometry, const FKey
 
 FReply UInventoryWidget::NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent)
 {
-    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
-    {
-        OnMouseButtonDown(EKeys::RightMouseButton);
-        return FReply::Handled();
-    }
 
-    return Super::NativeOnMouseButtonDown(MyGeometry, InMouseEvent);
+    OnMouseButtonDown(InMouseEvent.GetEffectingButton());
+    return FReply::Handled();
+
 }
 
 FReply UInventoryWidget::NativeOnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent)

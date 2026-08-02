@@ -110,9 +110,6 @@ public:
     // ========================================================================
 #pragma region Ammo & Reload
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Ammo")
-    int32 CurrentAmmo = 15;
-
     UPROPERTY(BlueprintReadOnly, Category = "Weapon|Reload")
     bool bIsReloading = false;
 
@@ -123,14 +120,13 @@ public:
     void GetAmmoInfo(int32& OutCurrent, int32& OutMax) const;
 
     void ConsumeAmmo();
-    void StartReload(int32 AmmoToAdd);
+    void StartReload();
     void StopReload();
 
     UFUNCTION()
     void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 private:
-    int32 PendingReloadAmount = 0;
     bool bLastIsEmpty = false;
     void CheckAmmoStateChange();
 #pragma endregion

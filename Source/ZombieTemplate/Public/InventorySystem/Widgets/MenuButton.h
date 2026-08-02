@@ -6,7 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "MenuButton.generated.h"
 
-
+class UItemMenu;
 
 UENUM(BlueprintType)
 enum class E_ItemActionType : uint8
@@ -59,7 +59,7 @@ class ZOMBIETEMPLATE_API UMenuButton : public UUserWidget
 	GENERATED_BODY()
 	
 protected:
-
+    virtual FReply NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent) override;
 
 public:
 
@@ -77,5 +77,11 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Menu Button Data")
     TMap<E_ItemActionType, FItemActionInfo> ActionInfoMap;
+
+    UPROPERTY()
+    UItemMenu* ItemMenu;
+
+    UFUNCTION()
+    void SetItemMenu(UItemMenu* InMenu);
 
 };

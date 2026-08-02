@@ -116,7 +116,7 @@ FActorSaveData AWeaponBase::GetSaveData_Implementation() const
     FActorSaveData Data;
     Data.ActorID = GetFName();
     Data.ActorClassPath = GetClass()->GetPathName();
-    Data.CurrentAmmo = CurrentAmmo;
+    Data.CurrentAmmo = InventoryItemPayload.AmmoAmount;
     // 配件状态
     Data.bCompensatorEquipped = bCompensatorEquipped;
     Data.bSilencerEquipped = bSilencerEquipped;
@@ -144,7 +144,7 @@ FActorSaveData AWeaponBase::GetSaveData_Implementation() const
 void AWeaponBase::RestoreState_Implementation(const FActorSaveData& Data)
 {
     // 弹药
-    CurrentAmmo = Data.CurrentAmmo;
+    InventoryItemPayload.AmmoAmount = Data.CurrentAmmo;
 
     bCompensatorEquipped = Data.bCompensatorEquipped;
     bSilencerEquipped = Data.bSilencerEquipped;
@@ -190,7 +190,7 @@ void AWeaponBase::ResetToDefault_Implementation()
     bCanDismember = false;
     DismemberPower = 1;
 
-    if (WeaponData) CurrentAmmo = WeaponData->AmmoAndUIConfig.MaxAmmo;
+    if (WeaponData) InventoryItemPayload.AmmoAmount = WeaponData->AmmoAndUIConfig.MaxAmmo;
 
     RefreshAttachmentVisuals();
 
@@ -234,7 +234,7 @@ void AWeaponBase::SoftReset()
     DismemberPower = 1;
 
     if (WeaponData)
-        CurrentAmmo = WeaponData->AmmoAndUIConfig.MaxAmmo;
+        InventoryItemPayload.AmmoAmount = WeaponData->AmmoAndUIConfig.MaxAmmo;
 
     RefreshAttachmentVisuals();
 }
@@ -558,13 +558,37 @@ void AWeaponBase::RemoveScope()
 }
 
 
-void AWeaponBase::StartReload(int32 AmmoToAdd)
+void AWeaponBase::StopReload()
+{
+    if (!bIsReloading) return;
+    bIsReloading = false;
+    // 停止手部蒙太奇
+    if (CachedHandsMesh && WeaponData->AnimMontageSet.ReloadMontage_Hands)
+    {
+        UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
+        if (HandsAnimInst && HandsAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Hands))
+        {
+            HandsAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Hands);
+        }
+    }
+    // 停止武器蒙太奇
+    if (Weapon_SKMesh && WeaponData->AnimMontageSet.ReloadMontage_Weapon)
+    {
+        UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
+        if (WeaponAnimInst && WeaponAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Weapon))
+        {
+            WeaponAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Weapon);
+        }
+    }
+}
+
+
+void AWeaponBase::StartReload()
 {
     // 检查状态
-    if (!bIsEquipped || bIsReloading || AmmoToAdd <= 0 || CurrentAmmo >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
+    if (!bIsEquipped || bIsReloading || InventoryItemPayload.AmmoAmount >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
 
     bIsReloading = true;
-    PendingReloadAmount = AmmoToAdd;   // 暂存数量，动画结束时使用
 
     // 播放手部换弹蒙太奇
     if (WeaponData->AnimMontageSet.ReloadMontage_Hands && CachedHandsMesh)
@@ -590,58 +614,19 @@ void AWeaponBase::StartReload(int32 AmmoToAdd)
     }
 }
 
-void AWeaponBase::StopReload()
-{
-    if (!bIsReloading) return;
-    bIsReloading = false;
-    // 停止手部蒙太奇
-    if (CachedHandsMesh && WeaponData->AnimMontageSet.ReloadMontage_Hands)
-    {
-        UAnimInstance* HandsAnimInst = CachedHandsMesh->GetAnimInstance();
-        if (HandsAnimInst && HandsAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Hands))
-        {
-            HandsAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Hands);
-        }
-    }
-    // 停止武器蒙太奇
-    if (Weapon_SKMesh && WeaponData->AnimMontageSet.ReloadMontage_Weapon)
-    {
-        UAnimInstance* WeaponAnimInst = Weapon_SKMesh->GetAnimInstance();
-        if (WeaponAnimInst && WeaponAnimInst->Montage_IsPlaying(WeaponData->AnimMontageSet.ReloadMontage_Weapon))
-        {
-            WeaponAnimInst->Montage_Stop(0.1f, WeaponData->AnimMontageSet.ReloadMontage_Weapon);
-        }
-    }
-}
 
 void AWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
     bIsReloading = false;
 
-
     // 只有正常结束且有待补充弹药时才处理
-    if (!bInterrupted && PendingReloadAmount > 0)
+    if (!bInterrupted)
     {
-        // 通知拥有者（玩家）消耗后备弹药，并获得实际可补充的数量
         AZombiePlayer* Player = Cast<AZombiePlayer>(GetOwner());
-        int32 ActualAdded = 0;
-        if (Player)
-        {
-            // 玩家返回实际消耗的后备弹药数（可能少于请求值，如果后备不足）
-            ActualAdded = Player->ConsumeReserveAmmo(PendingReloadAmount);
-        }
-        else
-        {
-            // 如果拥有者不是玩家（例如AI），则直接使用待补充量（不消耗后备）
-            ActualAdded = PendingReloadAmount;
-        }
-
-        // 填充武器弹药，确保不超过最大容量
-        CurrentAmmo = FMath::Min(CurrentAmmo + ActualAdded, WeaponData->AmmoAndUIConfig.MaxAmmo);
+        if (Player)  Player->ConsumeAmmoFromInventory();
         CheckAmmoStateChange();
     }
 
-    PendingReloadAmount = 0;
 }
 
 
@@ -774,15 +759,15 @@ void AWeaponBase::UpdateLaserTarget()
 
 void AWeaponBase::GetAmmoInfo(int32& OutCurrent, int32& OutMax) const
 {
-    OutCurrent = CurrentAmmo;
+    OutCurrent = InventoryItemPayload.AmmoAmount;
     OutMax = WeaponData->AmmoAndUIConfig.MaxAmmo;
 }
 
 void AWeaponBase::ConsumeAmmo()
 {
-    if (CurrentAmmo > 0)
+    if (InventoryItemPayload.AmmoAmount > 0)
     {
-        CurrentAmmo--;
+        InventoryItemPayload.AmmoAmount--;
         CheckAmmoStateChange();
     }
 }
@@ -797,7 +782,7 @@ float AWeaponBase::GetCurrentDamage() const
 
 void AWeaponBase::CheckAmmoStateChange()
 {
-    bool bIsEmpty = (CurrentAmmo <= 0);
+    bool bIsEmpty = (InventoryItemPayload.AmmoAmount <= 0);
     if (bIsEmpty != bLastIsEmpty)
     {
         OnAmmoEmptyStateChanged.Broadcast(bIsEmpty);

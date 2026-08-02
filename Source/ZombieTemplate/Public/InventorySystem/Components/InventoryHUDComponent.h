@@ -9,6 +9,7 @@
 #include "Items/InspectableItem.h"
 #include <Components/GridPanel.h>
 #include <InventorySystem/Structs/InventoryTypes.h>
+#include "Widgets/ItemMenu.h"
 #include "InventoryHUDComponent.generated.h"
 
 
@@ -107,7 +108,7 @@ class UInventoryWidget;
 class UInventorySlotWidget;
 class UInventoryGridPanelWidget;
 class UItemMenu;
-
+class UItemActionConfirmWidget;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZOMBIETEMPLATE_API UInventoryHUDComponent : public UActorComponent
@@ -250,7 +251,7 @@ public:
 	bool CanAddItem(AInspectableItem* Item, const E_SlotsType SlotsType = E_SlotsType::Primary, int32 ItemAmount = 0);
 
 	UFUNCTION()
-	void AddItem_HelperFunction(AInspectableItem* Item,  const EItemRotation Rotation, const TArray<int32>& Slots, const E_SlotsType SlotsType, const int32 Amount);
+	AInspectableItem* AddItem_HelperFunction(AInspectableItem* Item,  const EItemRotation Rotation, const TArray<int32>& Slots, const E_SlotsType SlotsType, const int32 Amount);
 
 	UFUNCTION()
 	void AddItemToSlots(AInspectableItem* Item,  int32 ItemAmount,const E_SlotsType SlotType);
@@ -292,6 +293,21 @@ public:
 
 	UFUNCTION()
 	UInventorySlotWidget* GetSlotWidgetByIndex(int32 InIndex, E_SlotsType InSlotType);
+
+	UFUNCTION()
+	void SplitItem(const int32 Index, E_SlotsType SlotType, const int32 Split, bool ReverseSplit);
+
+	UFUNCTION()
+	void MinoritySplitItem(const int32 Index, E_SlotsType SlotType);
+
+	UFUNCTION()
+	void DiscardItem(const int32 SlotIndex, const E_SlotsType SlotType, const int32 Amount = 1, const bool RemoveAll = false);
+
+	UFUNCTION()
+	void RemoveItemAmountFromInventory(const int32 InAmount, const FString TargetItemName);
+
+	UFUNCTION()
+	int32 FindAllItemAmountByName(FString& ItemName);
 
 #pragma endregion
 
@@ -428,12 +444,16 @@ public:
 #pragma endregion
 
 #pragma region Menu
+public:
+
 	UFUNCTION()
 	void CreateItemMenuWidget();
 
 	UFUNCTION()
 	void CloseItemMenuWidget(bool InPlaySound = true);
 
+	UFUNCTION()
+	void MenuButtonResponseFunction(E_ItemActionType ActionType);
 
 	UPROPERTY(EditDefaultsOnly)
 	TSubclassOf<UItemMenu> ItemMenuClass;
@@ -442,5 +462,31 @@ public:
 	UItemMenu* ItemMenuWidget;
 
 #pragma endregion
+
+#pragma region ConfirmWidget
+public:
+
+private:
+	
+	UPROPERTY()
+	UItemActionConfirmWidget* ConfirmWidget = nullptr;
+
+	UPROPERTY()
+	bool bIgnoreMouseUp = false; //用于关闭Menu控件鼠标抬起又出现Menu
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UItemActionConfirmWidget> ConfirmWidgetClass;
+
+	UPROPERTY()
+	FSlotInfo CreateMenuInfo{ CreateMenuInfo.Index = -1, CreateMenuInfo.Type = E_SlotsType::Primary };
+
+	UFUNCTION()
+	void CreateItemActionConfirmWidget(AInspectableItem* Item, bool ShowNumBlock, int32 InMaxValue, E_ItemActionType ActionType, bool ShowMsg = false);
+
+	UFUNCTION(BlueprintCallable, Category = "HUDInv|Comfirmation")
+	void ComfirmationMes(bool InYes, E_ItemActionType ActionType);
+
+#pragma endregion
+
 
 };

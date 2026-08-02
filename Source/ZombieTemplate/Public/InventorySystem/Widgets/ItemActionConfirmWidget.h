@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "MenuButton.h"
 #include "ItemActionConfirmWidget.generated.h"
+
 
 class URichTextBlock;
 class UButton;
@@ -37,5 +39,17 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	UButton* Btn_No;
+	
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ConfirmWidget")
+	void InitializeText(E_ItemActionType ActionType, const FString& InItemName);
+	virtual void InitializeText_Implementation(E_ItemActionType ActionType, const FString& InItemName);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ConfirmWidget")
+	void InitializeNumBlock(bool InShowNumBlock, int32 InMinValue, int32 InMaxValue);
+	virtual void InitializeNumBlock_Implementation(bool InShowNumBlock, int32 InMinValue, int32 InMaxValue);
+
+	UFUNCTION(BlueprintPure, BlueprintCallable, Category = "ConfirmWidget")
+	int32 GetValue();
 
 };

@@ -212,21 +212,16 @@ private:
 
 #pragma region Ammo
 public:
-    // 角色持有的备用弹药（按武器类型区分，当前简单起见使用单种武器）
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Ammo")
-    int32 ReserveAmmo = 30;   // 初始备用弹药，例如 3 个弹匣
 
-    // 获取备用弹药
+    UFUNCTION()
+    void ConsumeAmmoFromInventory();
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Weapon|Ammo")
-    int32 GetReserveAmmo() const { return ReserveAmmo; }
+    int32 GetWeaponAmmoFromInventory();
 
-    /** 消耗指定数量的后备弹药（返回实际消耗量） */
-    UFUNCTION(BlueprintCallable, Category = "Weapon|Ammo")
-    int32 ConsumeReserveAmmo(int32 Amount);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Ammo")
+    TMap<FString, FString> FindWeaponAmmo;
 
-    /** 拾取弹药，增加后备弹药 */
-    UFUNCTION(BlueprintCallable, Category = "Weapon|Ammo")
-    void PickupAmmo(int32 Amount);
 #pragma endregion
 
 

@@ -32,4 +32,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory Static Functions")
 	static int32 GetRow(const int32 ArrayIndex, const int32 Columns);
+
+
+
+
 };

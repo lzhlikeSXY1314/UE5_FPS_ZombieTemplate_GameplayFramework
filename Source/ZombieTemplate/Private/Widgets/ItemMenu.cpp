@@ -3,6 +3,37 @@
 
 #include "Widgets/ItemMenu.h"
 #include "InventorySystem/Widgets/MenuButton.h"
+#include "InventorySystem/Components/InventoryHUDComponent.h"
+
+
+
+
+void UItemMenu::NativeOnInitialized()
+{
+    Super::NativeOnInitialized();
+
+    if (WBP_Use)                WBP_Use->SetItemMenu(this);
+    if (WBP_Shortcut)           WBP_Shortcut->SetItemMenu(this);
+    if (WBP_Inspect)            WBP_Inspect->SetItemMenu(this);
+    if (WBP_Combine)            WBP_Combine->SetItemMenu(this);
+    if (WBP_Discard)            WBP_Discard->SetItemMenu(this);
+    if (WBP_Split)              WBP_Split->SetItemMenu(this);
+    if (WBP_Equip)              WBP_Equip->SetItemMenu(this);
+    if (WBP_AttachAttachment)   WBP_AttachAttachment->SetItemMenu(this);
+    if (WBP_DetachAttachment)   WBP_DetachAttachment->SetItemMenu(this);
+
+
+}
+
+FReply UItemMenu::NativeOnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+    {
+        CloseMenu();
+    }
+    return FReply::Handled();
+}
+
 
 void UItemMenu::InitMenuButtonVisibility(
     bool bUseEnabled,
@@ -34,4 +65,23 @@ void UItemMenu::InitMenuButtonVisibility(
     SetButtonVisibility(WBP_AttachAttachment, bAttachAttachmentEnabled);
     SetButtonVisibility(WBP_DetachAttachment, bDetachAttachmentEnabled);
 
+    OnItemActionSelected.AddDynamic(this, &UItemMenu::HandleMenuButtonEvents);
+}
+
+
+
+void UItemMenu::HandleMenuButtonEvents(E_ItemActionType ActionType)
+{
+    if (InventoryHUDComponent)
+    {
+        InventoryHUDComponent->MenuButtonResponseFunction(ActionType);
+    }
+}
+
+void UItemMenu::CloseMenu()
+{
+    if (InventoryHUDComponent)
+    {
+        InventoryHUDComponent->CloseItemMenuWidget();
+    }
 }

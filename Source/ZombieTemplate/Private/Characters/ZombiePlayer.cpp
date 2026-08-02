@@ -217,7 +217,7 @@ void AZombiePlayer::PerformFireTrace()
     if (!CurrentWeapon || CurrentWeapon->bIsReloading) return;
 
     // 空仓检查：如果弹药为0，播放空仓音效并退出（不消耗后备，也不开火）
-    if (CurrentWeapon->CurrentAmmo <= 0)
+    if (CurrentWeapon->InventoryItemPayload.AmmoAmount <= 0)
     {
         if (CurrentWeapon->WeaponData->VisualFX.EmptyMagSound)
         {
@@ -436,17 +436,39 @@ float AZombiePlayer::CalculateDamage(float Distance, FName BoneName) const
 
 }
 
-int32 AZombiePlayer::ConsumeReserveAmmo(int32 Amount)
+
+void AZombiePlayer::ConsumeAmmoFromInventory()
 {
-    int32 ActualConsume = FMath::Min(Amount, ReserveAmmo);
-    ReserveAmmo -= ActualConsume;
-    return ActualConsume;
+    if (!CurrentWeapon || !InventoryComponent) return;
+
+    const int32 CurrentAmmo = CurrentWeapon->InventoryItemPayload.AmmoAmount;
+    int32 NeededAmmo = CurrentWeapon->InventoryItemPayload.MaxStack - CurrentAmmo;
+
+    if (NeededAmmo <= 0) return;
+
+    const int32 TotalAvailableAmmo = GetWeaponAmmoFromInventory();
+    NeededAmmo = FMath::Min(NeededAmmo, TotalAvailableAmmo);
+
+    const FString* AmmoNamePtr = FindWeaponAmmo.Find(CurrentWeapon->InventoryItemPayload.ItemName);
+    if (!AmmoNamePtr) return;
+
+    // 从库存扣弹药
+    InventoryComponent->RemoveItemAmountFromInventory(NeededAmmo, *AmmoNamePtr);
+
+    // 填满武器弹药
+    CurrentWeapon->InventoryItemPayload.AmmoAmount = CurrentAmmo + NeededAmmo;
 }
 
-void AZombiePlayer::PickupAmmo(int32 Amount)
+
+
+int32 AZombiePlayer::GetWeaponAmmoFromInventory()
 {
-    if (Amount <= 0) return;
-    ReserveAmmo += Amount;
+    if (!InventoryComponent) return -1;
+    if (!CurrentWeapon) return -1;
+    const FString* AmmoNamePtr = FindWeaponAmmo.Find(CurrentWeapon->InventoryItemPayload.ItemName);
+    if(!AmmoNamePtr)  return -1;  
+    FString AmmoName = *AmmoNamePtr;
+    return InventoryComponent->FindAllItemAmountByName(AmmoName);
 }
 
 
@@ -598,18 +620,7 @@ void AZombiePlayer::ToggleFlashlight()
 void AZombiePlayer::Reload()
 {
     if (!CurrentWeapon) return;
-
-    // 武器当前已满弹，无需换弹
-    if (CurrentWeapon->CurrentAmmo >= CurrentWeapon->WeaponData->AmmoAndUIConfig.MaxAmmo) return;
-
-    // 计算需要补充的子弹数
-    int32 Needed = CurrentWeapon->WeaponData->AmmoAndUIConfig.MaxAmmo - CurrentWeapon->CurrentAmmo;
-
-    // 根据后备弹药实际可提供的数量
-    int32 TransferAmount = FMath::Min(Needed, ReserveAmmo);
-
-    // 通知武器执行换弹（传入将要补充的数量）
-    CurrentWeapon->StartReload(TransferAmount);
+    CurrentWeapon->StartReload();
 }
 
 float AZombiePlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)

@@ -18,6 +18,8 @@
 #include <Kismet/KismetMathLibrary.h>
 #include "InventorySystem/Widgets/ControlsHints.h"
 #include <Widgets/ItemMenu.h>
+#include "InventorySystem/Widgets/ItemActionConfirmWidget.h"
+
 
 void UInventoryHUDComponent::BeginPlay()
 {
@@ -25,6 +27,7 @@ void UInventoryHUDComponent::BeginPlay()
 
     InitializeSlots();
     DestroyAllTempObjects();
+    bIgnoreMouseUp = false;
 
     OnDragDetected.AddDynamic(this, &ThisClass::HandleDragDetected);
     OnChangingAdditionalSlots.AddDynamic(this, &ThisClass::OnAdditionSlotsChanged);
@@ -42,13 +45,13 @@ UInventoryHUDComponent::UInventoryHUDComponent()
 	PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bStartWithTickEnabled = true;
     PrimaryComponentTick.bTickEvenWhenPaused = true;
-
+  
 }
 
 void UInventoryHUDComponent::OpenInventory()
 {
     if (!InventoryWidgetClass) return;
-
+    bIgnoreMouseUp = false;
 
 
     APlayerController* PC = GetPlayerController();
@@ -107,34 +110,36 @@ void UInventoryHUDComponent::CloseInventory()
     UpdateControlHints(EInventoryStatus::Closed);
     LoadPrimarySlotsFromArray();
     PlayInventorySound(E_InventorySoundType::Close,false);
+    CreateMenuInfo.Index = -1;
+    CreateMenuInfo.Type = E_SlotsType::Primary;
 }
 
 void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
 {
-    if (InKey != EKeys::RightMouseButton)
+    if (InKey == EKeys::RightMouseButton)
     {
-        return;
+        if (DragWidget)
+        {
+            RotateItemWidget(true);
+            return;
+        }
+
+        if (ItemMenuWidget)
+        {
+            CloseItemMenuWidget();
+            return;
+        }
+
+        if (InventoryWidget)
+        {
+            InventoryWidget->ShowHideTempSlots(false);
+            InventoryWidget->CloseInventory();
+            CloseInventory();
+            return;
+        }
     }
 
-    if (DragWidget)
-    {
-        RotateItemWidget(true);
-        return;
-    }
-
-    if (ItemMenuWidget)
-    {
-        CloseItemMenuWidget();
-        return;
-    }
-
-    if (InventoryWidget)
-    {
-        InventoryWidget->ShowHideTempSlots(false);
-        InventoryWidget->CloseInventory();
-        CloseInventory();
-        return;
-    }
+  
 
 }
 
@@ -151,17 +156,24 @@ void UInventoryHUDComponent::OnMouseButtonUp(FKey InKey)
 
     if (InKey == EKeys::LeftMouseButton)
     {
-        if (!ItemMenuWidget)
-            {
-                CreateItemMenuWidget();
-                return;
-            }
+        if (!ItemMenuWidget && !ConfirmWidget && !bIgnoreMouseUp)
+        {
+            CreateItemMenuWidget();
+            return;
+        }
+        else
+        {
+            bIgnoreMouseUp = false;
+        }
     }
+
+
 }
 
 void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, bool InShouldPlaySound)
 {
     if (ItemMenuWidget) return;
+    if (ConfirmWidget) return;
 
     if (DragWidget)
     {
@@ -372,6 +384,12 @@ void UInventoryHUDComponent::DestroyAllTempObjects()
 
     if (ItemMenuWidget) ItemMenuWidget->RemoveFromParent();
     ItemMenuWidget = nullptr;
+
+    if (ConfirmWidget)
+    {
+        ConfirmWidget->RemoveFromParent();
+    }
+    ConfirmWidget = nullptr;
 }
 
 void UInventoryHUDComponent::InitializeSlots()
@@ -589,11 +607,11 @@ bool UInventoryHUDComponent::CanAddItem(AInspectableItem* Item, const E_SlotsTyp
     return false;
 }
 
-void UInventoryHUDComponent::AddItem_HelperFunction(AInspectableItem* Item, const EItemRotation Rotation, const TArray<int32>& Slots, const E_SlotsType SlotsType, const int32 Amount)
+AInspectableItem* UInventoryHUDComponent::AddItem_HelperFunction(AInspectableItem* Item, const EItemRotation Rotation, const TArray<int32>& Slots, const E_SlotsType SlotsType, const int32 Amount)
 {
-    if (!Item) return;
+    if (!Item) return nullptr;
     AInspectableItem* NewItem = NewObject<AInspectableItem>(this,Item->GetClass());
-    if (!NewItem) return;
+    if (!NewItem) return nullptr;
     NewItem->InventoryItemPayload = Item->InventoryItemPayload;
     NewItem->InventoryItemPayload.ItemAmount = Amount;
     NewItem->InventoryItemPayload.Rotation = Rotation;
@@ -602,6 +620,7 @@ void UInventoryHUDComponent::AddItem_HelperFunction(AInspectableItem* Item, cons
 
     FillSlots(NewItem, Slots, SlotsType);
     OnChangingAdditionalSlots.Broadcast();
+    return NewItem;
 }
 
 void UInventoryHUDComponent::AddItemToSlots(AInspectableItem* Item , int32 ItemAmount, const E_SlotsType SlotType)
@@ -844,6 +863,8 @@ UInventorySlotWidget* UInventoryHUDComponent::GetSlotWidgetByIndex(int32 InIndex
     }
     return nullptr;
 }
+
+
 
 void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, E_SlotsType SlotType)
 {
@@ -2103,7 +2124,11 @@ void UInventoryHUDComponent::CreateItemMenuWidget()
         SelectItem->InventoryItemPayload.bAttachAttachmentEnabled,
         SelectItem->InventoryItemPayload.bDetachAttachmentEnabled
     );
-    
+    ItemMenu->InventoryHUDComponent = this;
+
+    CreateMenuInfo.Index = SelectSlotIndex;
+    CreateMenuInfo.Type = SelectSlotType;
+
     if (!InventoryWidget || !InventoryWidget->CanvasPanel_Root) return;
     UCanvasPanelSlot* Slot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(ItemMenu);
     Slot->SetAutoSize(true);
@@ -2135,9 +2160,219 @@ void UInventoryHUDComponent::CloseItemMenuWidget(bool InPlaySound)
         UpdateControlHints(EInventoryStatus::Opened);
         SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
         PlayInventorySound(InPlaySound ? E_InventorySoundType::CloseMenu : E_InventorySoundType::None);
+       
     }
 }
 
+void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionType)
+{
+    PlayInventorySound(E_InventorySoundType::PushButton, true);
+    bIgnoreMouseUp = false;
+
+    if (ActionType == E_ItemActionType::Split)
+    {
+        AInspectableItem* Item = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+        if (!Item) return;
+        int32 Num = Item->InventoryItemPayload.ItemAmount;
+        if (Num > 3)
+        {
+            CreateItemActionConfirmWidget(Item, true, Num - 1, ActionType, true);
+            CloseItemMenuWidget();
+        }
+        else
+        {
+            MinoritySplitItem(CreateMenuInfo.Index, CreateMenuInfo.Type);
+            bIgnoreMouseUp = true;
+            CloseItemMenuWidget();
+        }
+
+        return;
+    }
+
+    if (ActionType == E_ItemActionType::Discard)
+    {
+        CloseItemMenuWidget();
+        AInspectableItem* Item = GetSlots(CreateMenuInfo.Type)[CreateMenuInfo.Index].ItemReference;
+        if (!Item) return;
+        int32 Num = Item->InventoryItemPayload.ItemAmount;
+        bool ShowNumBlock = Num > 1;
+        CreateItemActionConfirmWidget(Item, ShowNumBlock, Num, ActionType, true);
+        return;
+    }
+
+}
+
+
+void UInventoryHUDComponent::CreateItemActionConfirmWidget(AInspectableItem* Item, bool ShowNumBlock, int32 InMaxValue, E_ItemActionType ActionType, bool ShowMsg)
+{
+    if (ConfirmWidget)
+    {
+        ConfirmWidget->RemoveFromParent();
+    }
+
+    ConfirmWidget = nullptr;
+
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+    ConfirmWidget = CreateWidget<UItemActionConfirmWidget>(PC, ConfirmWidgetClass);
+    if (!ConfirmWidget) return;
+
+    ConfirmWidget->InitializeText(ActionType, Item->InventoryItemPayload.ItemName);
+    ConfirmWidget->InitializeNumBlock(ShowNumBlock, 1, InMaxValue);
+
+    if (InventoryWidget && InventoryWidget->CanvasPanel_Root)
+    {
+        UCanvasPanelSlot* Slot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(ConfirmWidget);
+        Slot->SetAutoSize(true);
+        Slot->SetAnchors(FAnchors(0,0,1,1));
+        Slot->SetOffsets(FMargin(0));
+        PlayInventorySound(ShowMsg ? E_InventorySoundType::ShowQuestion : E_InventorySoundType::ShowMessage);
+    }
+}
+
+void UInventoryHUDComponent::ComfirmationMes(bool InYes, E_ItemActionType ActionType)
+{
+    bIgnoreMouseUp = false;
+    PlayInventorySound(E_InventorySoundType::PushButton, true);
+    if (!InYes)
+    {
+        if (ConfirmWidget)
+        {
+            ConfirmWidget->RemoveFromParent();
+        }
+
+        ConfirmWidget = nullptr;
+        return;
+    }
+
+    if (ActionType == E_ItemActionType::Split)
+    {
+        if (!ConfirmWidget)  return;
+        SplitItem(CreateMenuInfo.Index, CreateMenuInfo.Type, ConfirmWidget->GetValue(), false);
+        ConfirmWidget->RemoveFromParent();
+        ConfirmWidget = nullptr;
+        return;
+    }
+
+    if (ActionType == E_ItemActionType::Discard)
+    {
+        if (!ConfirmWidget)  return;
+        DiscardItem(CreateMenuInfo.Index, CreateMenuInfo.Type, ConfirmWidget->GetValue(), false);
+        ConfirmWidget->RemoveFromParent();
+        ConfirmWidget = nullptr;
+        return;
+    }
+
+}
+
+void UInventoryHUDComponent::SplitItem(const int32 Index, E_SlotsType SlotType, const int32 Split, bool ReverseSplit)
+{
+    if (!GetSlots(SlotType).IsValidIndex(Index)) return;
+    AInspectableItem* Item = GetSlots(SlotType)[Index].ItemReference;
+    if (!IsValid(Item)) return;
+    const int32 Amount = Item->InventoryItemPayload.ItemAmount;
+    if (Amount <= 1) return;
+    if (Split >= Amount || Split <= 0) return;
+    TArray<int32> EmptySlots;
+    EItemRotation Rotation;
+    SlotType = SlotType == E_SlotsType::Equipment ? E_SlotsType::Primary : SlotType;
+
+    if (FindEmptySlots(SlotType, Item->InventoryItemPayload.ItemIconSize.X, Item->InventoryItemPayload.ItemIconSize.Y, Rotation, EmptySlots, TArray<int32>()))
+    {
+        if (!ReverseSplit)
+        {
+            AInspectableItem* AddItem = AddItem_HelperFunction(Item, Rotation, EmptySlots, SlotType, Split);
+            RemoveItemByRef(Item, Split, false);
+            AddItemWidgetToGrib(AddItem, SlotType);
+        }
+        else
+        {
+            AInspectableItem* AddItem = AddItem_HelperFunction(Item, Rotation, EmptySlots, SlotType, Amount - Split);
+            RemoveItemByRef(Item, Amount - Split, false);
+            AddItemWidgetToGrib(AddItem, SlotType);
+        }
+    }
+}
+
+void UInventoryHUDComponent::MinoritySplitItem(const int32 Index, E_SlotsType SlotType)
+{
+    if (!GetSlots(SlotType).IsValidIndex(Index)) return;
+    AInspectableItem* Item = GetSlots(SlotType)[Index].ItemReference;
+    if (!IsValid(Item)) return;
+    if (Item->InventoryItemPayload.ItemAmount <= 1) return;
+
+    int32 Amount = Item->InventoryItemPayload.ItemAmount;
+    const int32 Mod = Amount % 2;
+    Amount -= Mod == 0 ? 0 : 1;
+    Amount /= 2;
+
+    TArray<int32> EmptySlots;
+    EItemRotation Rotation;
+    SlotType = SlotType == E_SlotsType::Equipment ? E_SlotsType::Primary : SlotType;
+    if (FindEmptySlots(SlotType, Item->InventoryItemPayload.ItemIconSize.X, Item->InventoryItemPayload.ItemIconSize.Y, Rotation, EmptySlots, TArray<int32>()))
+    {
+        AInspectableItem* AddItem = AddItem_HelperFunction(Item, Rotation, EmptySlots, SlotType, Amount);
+        RemoveItemByRef(Item, Amount, false);
+        AddItemWidgetToGrib(AddItem, SlotType);
+    }
+
+}
+
+void UInventoryHUDComponent::DiscardItem(const int32 SlotIndex, const E_SlotsType SlotType, const int32 Amount, const bool RemoveAll)
+{
+    AInspectableItem* Item = nullptr;
+    if (!GetItemInSlot(SlotIndex, SlotType, Item)) return;
+    const int32 CanDiscard = RemoveAll ? Item->InventoryItemPayload.ItemAmount : Item->InventoryItemPayload.ItemAmount - Amount >= 0 ? Amount : Item->InventoryItemPayload.ItemAmount;
+
+    RemoveItemsInSlot(SlotIndex, SlotType, Amount, RemoveAll);
+
+    //可以对Inspection实现动播响应
+}
+
+void UInventoryHUDComponent::RemoveItemAmountFromInventory(const int32 InAmount, const FString TargetItemName)
+{
+    int32 RemainToRemove = InAmount;
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+
+    // 反向遍历
+    for (int32 i = Slots.Num() - 1; i >= 0 && RemainToRemove > 0; --i)
+    {
+        const FSlotStruct& Slot = Slots[i];
+
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) &&
+            Slot.ItemReference->InventoryItemPayload.ItemName == TargetItemName)
+        {
+            int32 SlotAmount = Slot.ItemReference->InventoryItemPayload.ItemAmount;
+
+            if (SlotAmount >= RemainToRemove)
+            {
+                // 这个格子够扣
+                RemoveItemsInSlot(Slot.Index, E_SlotsType::Primary, RemainToRemove, false);
+                RemainToRemove = 0;
+            }
+            else
+            {
+                // 扣光这个格子
+                RemoveItemsInSlot(Slot.Index, E_SlotsType::Primary, SlotAmount, false);
+                RemainToRemove -= SlotAmount;
+            }
+        }
+    }
+}
+
+int32 UInventoryHUDComponent::FindAllItemAmountByName(FString& ItemName)
+{
+    int32 AllItemAmount = 0;
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
+        {
+            AllItemAmount += Slot.ItemReference->InventoryItemPayload.ItemAmount;
+        }
+    }
+    return AllItemAmount;
+}
 
 
 
