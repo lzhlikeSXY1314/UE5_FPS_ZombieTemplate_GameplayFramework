@@ -19,6 +19,8 @@
 #include "InventorySystem/Widgets/ControlsHints.h"
 #include <Widgets/ItemMenu.h>
 #include "InventorySystem/Widgets/ItemActionConfirmWidget.h"
+#include "Characters/ZombiePlayer.h"
+#include "Items/WeaponBase.h"
 
 
 void UInventoryHUDComponent::BeginPlay()
@@ -134,7 +136,6 @@ void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
         {
             InventoryWidget->ShowHideTempSlots(false);
             InventoryWidget->CloseInventory();
-            CloseInventory();
             return;
         }
     }
@@ -620,6 +621,7 @@ AInspectableItem* UInventoryHUDComponent::AddItem_HelperFunction(AInspectableIte
 
     FillSlots(NewItem, Slots, SlotsType);
     OnChangingAdditionalSlots.Broadcast();
+
     return NewItem;
 }
 
@@ -720,7 +722,6 @@ void UInventoryHUDComponent::SetItemAmount(AInspectableItem* Item, const int32 A
             UItemWidget* ItemWidget = GetItemWidgetByIndex(Index, SlotsType);
             if (!ItemWidget) return;
             // 设置数量
-            ItemWidget->InventoryItemPayload.ItemAmount = Amount;
             ItemWidget->SetAmount();
 
         }
@@ -1837,6 +1838,8 @@ void UInventoryHUDComponent::OnAdditionSlotsChanged()
     {
         InventoryWidget->ShowHideTempAnim(false);
     }
+
+    
 }
 
 bool UInventoryHUDComponent::IsSlotsHaveItems(const E_SlotsType SlotsType)
@@ -1883,8 +1886,6 @@ void UInventoryHUDComponent::LoadPrimarySlotsFromArray()
             Data.Item->InventoryItemPayload.SlotsType = Data.SlotsType;
 
             FillSlots(Data.Item, Data.Slots, Data.SlotsType);
-
-
         }
 
         if (HiddenSlots.IsValidIndex(0) && IsValid(HiddenSlots[0].ItemReference))
@@ -2122,7 +2123,8 @@ void UInventoryHUDComponent::CreateItemMenuWidget()
         SelectItem->InventoryItemPayload.bSplitEnabled,
         SelectItem->InventoryItemPayload.bEquipEnabled,
         SelectItem->InventoryItemPayload.bAttachAttachmentEnabled,
-        SelectItem->InventoryItemPayload.bDetachAttachmentEnabled
+        SelectItem->InventoryItemPayload.bDetachAttachmentEnabled,
+        SelectItem->InventoryItemPayload.IsEquipped
     );
     ItemMenu->InventoryHUDComponent = this;
 
@@ -2200,6 +2202,21 @@ void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionT
         return;
     }
 
+    if (ActionType == E_ItemActionType::Equip)
+    {
+        bIgnoreMouseUp = true;
+        AInspectableItem* Item = GetSlots(CreateMenuInfo.Type)[CreateMenuInfo.Index].ItemReference;
+        if (!Item) return;
+        AZombiePlayer* Player = UInventoryStaticFunctions::GetPlayerRef(this);
+        if (!Player) return;
+
+        if (InventoryWidget)
+        {
+            InventoryWidget->ShowHideTempSlots(false);
+            InventoryWidget->CloseInventory();
+        }
+        Player->RequestToggleWeapon(Item->InventoryItemPayload.ItemName, Item->InventoryItemPayload.IsEquipped);
+    }
 }
 
 
@@ -2327,6 +2344,7 @@ void UInventoryHUDComponent::DiscardItem(const int32 SlotIndex, const E_SlotsTyp
     RemoveItemsInSlot(SlotIndex, SlotType, Amount, RemoveAll);
 
     //可以对Inspection实现动播响应
+    Item->DiscardItemInInventory(Amount);
 }
 
 void UInventoryHUDComponent::RemoveItemAmountFromInventory(const int32 InAmount, const FString TargetItemName)
@@ -2372,6 +2390,34 @@ int32 UInventoryHUDComponent::FindAllItemAmountByName(FString& ItemName)
         }
     }
     return AllItemAmount;
+}
+
+void UInventoryHUDComponent::UpdateEquipStateByName(const FString& ItemName, bool ClearAllWeaponState)
+{
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
+        {
+            Slot.ItemReference->InventoryItemPayload.IsEquipped = ClearAllWeaponState ? false: true;           
+        }
+        else if(!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName != ItemName)
+        {
+            Slot.ItemReference->InventoryItemPayload.IsEquipped = false;
+        }
+    }
+}
+
+void UInventoryHUDComponent::UpdateAllWeaponWidgetAmmoByName(const FString& ItemName, int32 Amount)
+{
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
+        {
+            Slot.ItemReference->InventoryItemPayload.AmmoAmount = Amount;
+        }
+    }
 }
 
 

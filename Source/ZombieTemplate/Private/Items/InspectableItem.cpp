@@ -83,12 +83,23 @@ void AInspectableItem::OnInteract_Implementation(AActor* Interactor)
 {
     UInventoryHUDComponent* InventoryHUD = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
     if (!InventoryHUD) return;
+
+    if (InventoryItemPayload.IsWeapon)
+    {
+        InventoryItemPayload.ItemAmount = FMath::Max(1, InventoryItemPayload.ItemAmount) ;
+    }
+
     if (InventoryItemPayload.ItemAmount <= 0) return;
     if(!InventoryHUD->CanAddItem(this,E_SlotsType::Primary,InventoryItemPayload.ItemAmount)) return;
 
     InventoryHUD->AddItemToSlots(this, InventoryItemPayload.ItemAmount, E_SlotsType::Primary);
     InventoryHUD->PlayInventorySound(E_InventorySoundType::PickupItem,false);
 }
+
+void AInspectableItem::DiscardItemInInventory_Implementation(int32 Quantity)
+{
+}
+
 
 // Called when the game starts or when spawned
 void AInspectableItem::BeginPlay()
@@ -102,4 +113,6 @@ void AInspectableItem::BeginPlay()
     VisualMesh->SetWorldScale3D(MeshScale);
 
     OriginalWorldTransform = GetActorTransform(); //SaveGame
+
+
 }

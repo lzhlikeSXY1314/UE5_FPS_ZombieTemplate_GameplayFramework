@@ -309,6 +309,13 @@ public:
 	UFUNCTION()
 	int32 FindAllItemAmountByName(FString& ItemName);
 
+	UFUNCTION()
+	void UpdateEquipStateByName(const FString& ItemName, bool ClearAllWeaponState = false);
+
+	UFUNCTION()
+	void UpdateAllWeaponWidgetAmmoByName(const FString& ItemName, int32 Amount);
+
+
 #pragma endregion
 
 

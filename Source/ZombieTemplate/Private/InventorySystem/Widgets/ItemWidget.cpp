@@ -15,8 +15,8 @@ void UItemWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     SelectItemBackgroundMaterial(false,false);
-    LoadItemIconAsync();
-    LoadBulletIconAsync();
+    LoadItemIcon();      // 改为同步
+    LoadBulletIcon();    // 改为同步
     SetAmount();
     SetItemWidgetAspectRatio();
 }
@@ -45,62 +45,23 @@ void UItemWidget::SelectItemBackgroundMaterial(bool bIsSelected, bool bIsOpenMen
     if (TargetMat)   Background->SetBrushFromMaterial(TargetMat);
 }
 
-void UItemWidget::LoadItemIconAsync()
-{
-    if (!ItemIcon) return;
-    TSoftObjectPtr<UTexture2D> SoftRef = InventoryItemPayload.ItemIconSoftRef;
-    if (!SoftRef.IsValid())
-    {
-        ItemIcon->SetBrushFromTexture(nullptr);
-        return;
-    }
-    FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-    Streamable.RequestAsyncLoad(
-        SoftRef.ToSoftObjectPath(),
-        FStreamableDelegate::CreateUObject(this, &UItemWidget::OnItemIconLoaded, SoftRef)
-    );
 
-}
-
-void UItemWidget::OnItemIconLoaded(TSoftObjectPtr<UTexture2D> SoftRef)
-{
-    if (UTexture2D* Tex = SoftRef.Get())
-    {
-        if (!ItemIcon) return;
-        if (!CachedMaterial || CachedMaterial->Parent != ItemMaterial)
-        {
-            CachedMaterial = UKismetMaterialLibrary::CreateDynamicMaterialInstance(
-                this, ItemMaterial, NAME_None, EMIDCreationFlags::None);
-        }
-
-        if (CachedMaterial)
-        {
-            CachedMaterial->SetTextureParameterValue(FName("Icon"), Tex);
-
-            float Angle = (Rotation == EItemRotation::Vertical) ? -0.25f : 0.0f;
-            CachedMaterial->SetScalarParameterValue(FName("Angle"), Angle);
-
-            ItemIcon->SetBrushFromMaterial(CachedMaterial);
-        }
-    }
-}
-
-void UItemWidget::LoadBulletIconAsync()
-{
-    if (!BulletImage) return;
-    TSoftObjectPtr<UTexture2D> SoftRef = InventoryItemPayload.BulletIconSoftRef;
-    if (!SoftRef.IsValid())
-    {
-        BulletImage->SetBrushFromTexture(nullptr);
-        return;
-    }
-    FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-    Streamable.RequestAsyncLoad(
-        SoftRef.ToSoftObjectPath(),
-        FStreamableDelegate::CreateUObject(this, &UItemWidget::OnBulletIconLoaded, SoftRef)
-    );
-
-}
+//void UItemWidget::LoadBulletIconAsync()
+//{
+//    if (!BulletImage) return;
+//    TSoftObjectPtr<UTexture2D> SoftRef = InventoryItemPayload.BulletIconSoftRef;
+//    if (!SoftRef.IsValid())
+//    {
+//        BulletImage->SetBrushFromTexture(nullptr);
+//        return;
+//    }
+//    FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
+//    Streamable.RequestAsyncLoad(
+//        SoftRef.ToSoftObjectPath(),
+//        FStreamableDelegate::CreateUObject(this, &UItemWidget::OnBulletIconLoaded, SoftRef)
+//    );
+//
+//}
 
 void UItemWidget::SetAmount()
 {
@@ -178,13 +139,42 @@ void UItemWidget::SetItemWidgetAspectRatio()
     SizeBox_Root->SetHeightOverride(Height);
 }
 
-void UItemWidget::OnBulletIconLoaded(TSoftObjectPtr<UTexture2D> SoftRef)
+void UItemWidget::LoadBulletIcon()
 {
-    if (UTexture2D* Tex = SoftRef.Get())
+    if (!BulletImage) return;
+
+    UTexture2D* Tex = InventoryItemPayload.BulletIconSoftRef.LoadSynchronous();
+    if (!Tex)
     {
-        if (!BulletImage) return;
-        BulletImage->SetBrushFromTexture(Tex);
-        BulletImage->SetDesiredSizeOverride(FVector2D(InventoryItemPayload.BulletImageSize.X, InventoryItemPayload.BulletImageSize.Y));
+        BulletImage->SetBrushFromTexture(nullptr);
+        return;
     }
+
+    BulletImage->SetBrushFromTexture(Tex);
+    BulletImage->SetDesiredSizeOverride(FVector2D(InventoryItemPayload.BulletImageSize.X, InventoryItemPayload.BulletImageSize.Y));
 }
 
+void UItemWidget::LoadItemIcon()
+{
+    if (!ItemIcon) return;
+    UTexture2D* Tex = InventoryItemPayload.ItemIconSoftRef.LoadSynchronous();
+    if (!Tex)
+    {
+        ItemIcon->SetBrushFromTexture(nullptr);
+        return;
+    }
+
+    if (!CachedMaterial || CachedMaterial->Parent != ItemMaterial)
+    {
+        CachedMaterial = UKismetMaterialLibrary::CreateDynamicMaterialInstance(
+            this, ItemMaterial, NAME_None, EMIDCreationFlags::None);
+    }
+
+    if (CachedMaterial)
+    {
+        CachedMaterial->SetTextureParameterValue(FName("Icon"), Tex);
+        float Angle = (Rotation == EItemRotation::Vertical) ? -0.25f : 0.0f;
+        CachedMaterial->SetScalarParameterValue(FName("Angle"), Angle);
+        ItemIcon->SetBrushFromMaterial(CachedMaterial);
+    }
+}

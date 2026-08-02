@@ -112,6 +112,7 @@ void AZombiePlayer::BeginPlay()
                 DefaultArmsRelativeLocation = FPSSkeletalMesh->GetRelativeLocation();
             }
 
+            AllOwnerWeapons.Empty();
 }
 
 // Called every frame
@@ -163,6 +164,18 @@ void AZombiePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
         //打开库存绑定
         EnhancedInput->BindAction(IA_OpenInventory, ETriggerEvent::Triggered, this, &AZombiePlayer::OpenInventory);
     }
+}
+
+void AZombiePlayer::DropWeaponInInventory()
+{
+    if (!CurrentWeapon) return;
+
+    const FString WeaponItemName = CurrentWeapon->InventoryItemPayload.ItemName;
+    RemoveWeaponRefByName(CurrentWeapon->InventoryItemPayload.ItemName);
+    CurrentWeapon->Drop();
+    CurrentWeapon = nullptr;
+    CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
+    StopAiming();
 }
 
 void AZombiePlayer::Move(const FInputActionValue& Value)
@@ -343,6 +356,37 @@ void AZombiePlayer::StopSprinting()
     GetCharacterMovement()->MaxWalkSpeed = NormalWalkSpeed;
 }
 
+void AZombiePlayer::RemoveWeaponRefByName(FString WeaponName)
+{
+    for (int32 i = AllOwnerWeapons.Num() - 1; i >= 0; --i)
+    {
+        AWeaponBase* Weapon = AllOwnerWeapons[i];
+        if (!Weapon) continue;
+
+        if (Weapon->InventoryItemPayload.ItemName.Equals(WeaponName, ESearchCase::IgnoreCase))
+        {
+            AllOwnerWeapons.RemoveAt(i);
+            return ; 
+        }
+    }
+    return;
+}
+
+AWeaponBase* AZombiePlayer::FindWeaponRefByName(FString WeaponName)
+{
+    for (int32 i = AllOwnerWeapons.Num() - 1; i >= 0; --i)
+    {
+        AWeaponBase* Weapon = AllOwnerWeapons[i];
+        if (!Weapon) continue;
+
+        if (Weapon->InventoryItemPayload.ItemName.Equals(WeaponName, ESearchCase::IgnoreCase))
+        {
+            return Weapon;
+        }
+    }
+    return nullptr;
+}
+
 void AZombiePlayer::UpdateFOV(float Value)
 {
     if (FPS_Camera)
@@ -386,6 +430,8 @@ void AZombiePlayer::EquipWeaponDirect(AWeaponBase* Weapon)
         // 注意：这里故意省略 PlayPickUpMontage()，避免加载存档时播放动画
     }
 }
+
+
 
 void AZombiePlayer::UpdateArmsFromFOV(float FOVValue)
 {
@@ -437,12 +483,79 @@ float AZombiePlayer::CalculateDamage(float Distance, FName BoneName) const
 }
 
 
+void AZombiePlayer::RequestToggleWeapon(const FString& WeaponName, bool IsEquipped)
+{
+    if (!FindWeaponRefByName(WeaponName)) return;
+
+    PendingToggleWeaponName = WeaponName;
+    bPendingIsEquipped = IsEquipped;
+
+    if (CurrentWeapon)  CurrentWeapon->StopReload();
+
+    // 播放蒙太奇
+    if (EquipMontage && FPSSkeletalMesh && FPSSkeletalMesh->GetAnimInstance() && !bPendingIsEquipped && CurrentWeapon)
+    {
+        UAnimInstance* AnimInstance = FPSSkeletalMesh->GetAnimInstance();
+        if (AnimInstance)
+        {
+            AnimInstance->StopAllMontages(0.0);
+            // 播放蒙太奇并设置结束回调
+            AnimInstance->Montage_Play(EquipMontage);
+            // 绑定结束委托
+            FOnMontageEnded MontageEndedDelegate;
+            MontageEndedDelegate.BindUObject(this, &AZombiePlayer::OnEquipMontageEnded);
+
+            AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, EquipMontage);
+
+        }
+    }
+    else
+    {
+        // 如果没有配置蒙太奇，直接切换
+        PerformToggleWeapon(WeaponName);
+    }
+
+}
+
+void AZombiePlayer::OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+    PerformToggleWeapon(PendingToggleWeaponName);
+    PendingToggleWeaponName.Empty();
+    bPendingIsEquipped = false;
+}
+
+void AZombiePlayer::PerformToggleWeapon(const FString& WeaponName)
+{
+    AWeaponBase* EquippedWeapon = FindWeaponRefByName(WeaponName);
+    if (!EquippedWeapon) return;
+
+    // 卸下当前武器
+    if (CurrentWeapon)
+    {
+   
+        CurrentWeapon->UnEquip(this);
+    }
+
+    if (bPendingIsEquipped)
+    {
+        CurrentWeapon = nullptr;
+        CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
+        return;
+    }
+
+    // 装备新武器
+    EquippedWeapon->CanDirEquipped = true;
+    EquippedWeapon->Equip(this);
+    CurrentAnimState = EPlayerAnimState::CG_Handgun_AnimState;
+    CurrentWeapon = EquippedWeapon;
+}
+
 void AZombiePlayer::ConsumeAmmoFromInventory()
 {
     if (!CurrentWeapon || !InventoryComponent) return;
 
     const int32 CurrentAmmo = CurrentWeapon->InventoryItemPayload.AmmoAmount;
-    int32 NeededAmmo = CurrentWeapon->InventoryItemPayload.MaxStack - CurrentAmmo;
+    int32 NeededAmmo = CurrentWeapon->WeaponData->AmmoAndUIConfig.MaxAmmo - CurrentAmmo;
 
     if (NeededAmmo <= 0) return;
 
@@ -459,18 +572,24 @@ void AZombiePlayer::ConsumeAmmoFromInventory()
     CurrentWeapon->InventoryItemPayload.AmmoAmount = CurrentAmmo + NeededAmmo;
 }
 
-
-
 int32 AZombiePlayer::GetWeaponAmmoFromInventory()
 {
-    if (!InventoryComponent) return -1;
-    if (!CurrentWeapon) return -1;
+    if (!InventoryComponent) return 0;
+    if (!CurrentWeapon) return 0;
     const FString* AmmoNamePtr = FindWeaponAmmo.Find(CurrentWeapon->InventoryItemPayload.ItemName);
-    if(!AmmoNamePtr)  return -1;  
+    if(!AmmoNamePtr)  return 0;
     FString AmmoName = *AmmoNamePtr;
     return InventoryComponent->FindAllItemAmountByName(AmmoName);
 }
 
+void AZombiePlayer::UpdateAllWeaponAmmoWidget()
+{
+    for(AWeaponBase* Weapon : AllOwnerWeapons)
+    {
+        if (!Weapon || !InventoryComponent) continue;
+        InventoryComponent->UpdateAllWeaponWidgetAmmoByName(Weapon->InventoryItemPayload.ItemName, Weapon->InventoryItemPayload.AmmoAmount);
+    }
+}
 
 void AZombiePlayer::PlayPickUpMontage()
 {
@@ -497,50 +616,63 @@ void AZombiePlayer::Interact()
 
     if (AWeaponBase* NewWeapon = Cast<AWeaponBase>(Target))
     {
-        // 调用接口，而不是直接 Equip
         if (NewWeapon->Implements<UInteractable>())
         {
             PlayPickUpMontage();
+            if (CurrentWeapon)
+            {
+                NewWeapon->CanDirEquipped = false;
+                if (CurrentWeapon->bIsReloading)
+                {
+                    CurrentWeapon->StopReload();
+                    StopAiming();
+                }
+            }
+            AllOwnerWeapons.Add(NewWeapon);
             IInteractable::Execute_OnInteract(NewWeapon, this);
         }
+        if (CurrentWeapon)  return;
+        CurrentWeapon = NewWeapon; 
 
-        // 如果武器已经装备成功，更新 CurrentWeapon
-        if (NewWeapon->IsEquipped())
-        {
-            if (CurrentWeapon && CurrentWeapon != NewWeapon)
-            {
-                CurrentWeapon->Drop();
-            }
-            CurrentWeapon = NewWeapon;
-            CurrentAnimState = EPlayerAnimState::CG_Handgun_AnimState;
-        }
+        CurrentAnimState = EPlayerAnimState::CG_Handgun_AnimState;
     }
     else
     {
         // 非武器物品
         if (Target->Implements<UInteractable>())
         {
+            if (CurrentWeapon)
+            {
+                if (CurrentWeapon->bIsReloading)
+                {
+                    CurrentWeapon->StopReload();
+                    StopAiming();
+                }
+            }
+
             PlayPickUpMontage();
             IInteractable::Execute_OnInteract(Target, this);
         }
     }
-
     InteractionComp->ClearBestTarget();
-
-
 }
 
 void AZombiePlayer::DropWeapon()
 {
-    if (CurrentWeapon)
+    if (!CurrentWeapon) return;
+
+    const FString WeaponItemName = CurrentWeapon->InventoryItemPayload.ItemName;
+    RemoveWeaponRefByName(WeaponItemName);
+    CurrentWeapon->Drop();
+    CurrentWeapon = nullptr;
+    CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
+
+    if (InventoryComponent)
     {
-        CurrentWeapon->Drop();
-        CurrentWeapon = nullptr;
-        CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
+        InventoryComponent->RemoveItemAmountFromInventory(1, WeaponItemName);
     }
 
-    // 退出瞄准状态
-        StopAiming();
+    StopAiming();
 }
 
 void AZombiePlayer::PlayADSSound(bool bStart)
@@ -607,7 +739,6 @@ void AZombiePlayer::StopAiming()
 
     SetAimingState(false);
 }
-
 
 void AZombiePlayer::ToggleFlashlight()
 {
@@ -726,6 +857,7 @@ void AZombiePlayer::OpenInventory()
 {
     if (InventoryComponent)
     {
+        UpdateAllWeaponAmmoWidget();
         InventoryComponent->OpenInventory();
     }
 }

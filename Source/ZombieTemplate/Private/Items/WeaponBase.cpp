@@ -6,8 +6,8 @@
 #include <Kismet/GameplayStatics.h>
 #include "Particles/ParticleSystemComponent.h"
 #include <Characters/ZombiePlayer.h>
-
-
+#include "InventorySystem/Functions/InventoryStaticFunctions.h"
+#include "InventorySystem/Components/InventoryHUDComponent.h"
 
 // Sets default values
 AWeaponBase::AWeaponBase()
@@ -106,6 +106,7 @@ void AWeaponBase::Tick(float DeltaTime)
     }
 }
 
+
 FName AWeaponBase::GetUniqueSaveID_Implementation() const
 {
     return GetFName();
@@ -123,7 +124,7 @@ FActorSaveData AWeaponBase::GetSaveData_Implementation() const
     Data.bScopeEquipped = bScopeEquipped;
     Data.bLightAttachmentEquipped = bLightAttachmentEquipped;
     Data.bFlashlightBeamOn = bFlashlightBeamOn;
-    if (bIsEquipped && GetAttachParentActor())
+    if (InventoryItemPayload.IsEquipped && GetAttachParentActor())
     {
         Data.bEquipped = true;
         Data.EquipSocket = AttachSocketName;
@@ -164,7 +165,7 @@ void AWeaponBase::ResetToDefault_Implementation()
 {
     if (GetAttachParentActor()) DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
     SetActorTransform(OriginalWorldTransform);
-    bIsEquipped = false;
+    InventoryItemPayload.IsEquipped = false;
     SetOwner(nullptr);          
     CachedHandsMesh = nullptr;  
 
@@ -340,16 +341,8 @@ void AWeaponBase::OnInteract_Implementation(AActor* Interactor)
 
 void AWeaponBase::Equip(AActor* NewOwner)
 {
-    if (!NewOwner || bIsEquipped) return;
+    if (!NewOwner || InventoryItemPayload.IsEquipped) return;
 
-    DisableWeaponPhysics();
-
-    if (Weapon_SKMesh)
-    {
-        Weapon_SKMesh->SetVisibility(true);
-    }
-
-    // 确定要附着的骨骼网格体
     USkeletalMeshComponent* AttachTargetMesh = nullptr;
 
     if (ACharacter* Character = Cast<ACharacter>(NewOwner))
@@ -367,29 +360,33 @@ void AWeaponBase::Equip(AActor* NewOwner)
             }
         }
 
-        // 如果没找到，回退到默认的第三人称 Mesh
-        if (!AttachTargetMesh)
+        if (!AttachTargetMesh) return;
+
+        DisableWeaponPhysics();
+
+        if (Weapon_SKMesh)
         {
-            AttachTargetMesh = Character->GetMesh();
+            Weapon_SKMesh->SetVisibility(true);
         }
     }
 
     if (AttachTargetMesh)
     {
-        AttachToComponent(AttachTargetMesh,
-            FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-            AttachSocketName);
-    }
-    else
-    {
-        // 找不到合适网格体，恢复掉落状态（丢弃）
-        EnableWeaponPhysics();
-        if (Weapon_SKMesh) Weapon_SKMesh->SetVisibility(false);
-        return; // 直接返回，不标记为已装备
+        FName TargetAttachSocketName = CanDirEquipped ? AttachSocketName : AttachBackSocketName;
+        AttachToComponent(AttachTargetMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, TargetAttachSocketName);
+
     }
 
+    UInventoryHUDComponent* HUDComponent = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+    if (HUDComponent && CanDirEquipped)
+    {
+        HUDComponent->UpdateEquipStateByName(InventoryItemPayload.ItemName);
+    }
+
+   
+
     SetOwner(NewOwner);
-    bIsEquipped = true;
+    InventoryItemPayload.IsEquipped = CanDirEquipped;
     OnInteract.Broadcast(true);
     if (LaserDot)
     {
@@ -397,7 +394,7 @@ void AWeaponBase::Equip(AActor* NewOwner)
             [this]()
             {
                 // 仅在装备状态仍有效且附件仍装备时显示
-                if (bIsEquipped && bLightAttachmentEquipped && LaserDot)
+                if (InventoryItemPayload.IsEquipped && bLightAttachmentEquipped && LaserDot)
                 {
                     LaserDot->SetVisibility(true);
                 }
@@ -409,9 +406,43 @@ void AWeaponBase::Equip(AActor* NewOwner)
 
 }
 
+void AWeaponBase::UnEquip(AActor* NewOwner)
+{
+    if (!NewOwner || !InventoryItemPayload.IsEquipped) return;
+    USkeletalMeshComponent* AttachTargetMesh = nullptr;
+    if (ACharacter* Character = Cast<ACharacter>(NewOwner))
+    {
+        TArray<USkeletalMeshComponent*> SkelComps;
+        Character->GetComponents<USkeletalMeshComponent>(SkelComps);
+        for (USkeletalMeshComponent* Comp : SkelComps)
+        {
+            if (Comp->ComponentHasTag(FName("FPSMesh")))
+            {
+                AttachTargetMesh = Comp;
+                CachedHandsMesh = AttachTargetMesh;
+                break;
+            }
+        }
+
+        if (!AttachTargetMesh) return;
+
+        DisableWeaponPhysics();
+        if (AttachTargetMesh) AttachToComponent(AttachTargetMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, AttachBackSocketName);
+
+        UInventoryHUDComponent* HUDComponent = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+        if (HUDComponent)
+        {
+            HUDComponent->UpdateEquipStateByName(InventoryItemPayload.ItemName, true);
+        }
+
+        InventoryItemPayload.IsEquipped = false;
+        if (LaserDot) LaserDot->SetVisibility(false);;
+    }
+}
+
 void AWeaponBase::EquipCompensator()
 {
-    if (!bIsEquipped) return;
+    if (!InventoryItemPayload.IsEquipped) return;
     
     if (bSilencerEquipped) RemoveSilencer(); // 互斥
 
@@ -465,7 +496,7 @@ void AWeaponBase::RemoveCompensator()
 void AWeaponBase::EquipSilencer()
 {
     
-    if (!bIsEquipped) return;
+    if (!InventoryItemPayload.IsEquipped) return;
     if (bCompensatorEquipped) RemoveCompensator();
 
     if (SilencerMesh) SilencerMesh->SetVisibility(true);
@@ -512,7 +543,7 @@ void AWeaponBase::RemoveSilencer()
 void AWeaponBase::EquipScope()
 {
     
-    if (!bIsEquipped || !ScopeMesh) return;
+    if (!InventoryItemPayload.IsEquipped || !ScopeMesh) return;
     ScopeMesh->SetVisibility(true);
     if (ScopeSlotCoverMesh) ScopeSlotCoverMesh->SetVisibility(false);
     bScopeEquipped = true;
@@ -557,7 +588,6 @@ void AWeaponBase::RemoveScope()
     bScopeEquipped = false;
 }
 
-
 void AWeaponBase::StopReload()
 {
     if (!bIsReloading) return;
@@ -586,7 +616,12 @@ void AWeaponBase::StopReload()
 void AWeaponBase::StartReload()
 {
     // 检查状态
-    if (!bIsEquipped || bIsReloading || InventoryItemPayload.AmmoAmount >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
+    if (!InventoryItemPayload.IsEquipped || bIsReloading || InventoryItemPayload.AmmoAmount >= WeaponData->AmmoAndUIConfig.MaxAmmo) return;
+    AZombiePlayer* Player = Cast<AZombiePlayer>(GetOwner());
+    if (Player)
+    {
+        if(Player->GetWeaponAmmoFromInventory() <= 0) return;
+    }
 
     bIsReloading = true;
 
@@ -640,7 +675,7 @@ void AWeaponBase::ActivateCaseEject()
 
 void AWeaponBase::EquipLightAttachment()
 {
-    if (!bIsEquipped || bLightAttachmentEquipped) return;
+    if (!InventoryItemPayload.IsEquipped || bLightAttachmentEquipped) return;
    
     // 显示外壳和激光模型（激光一直亮）
     if (FlashlightMesh) FlashlightMesh->SetVisibility(true);
@@ -657,7 +692,7 @@ void AWeaponBase::EquipLightAttachment()
             [this]()
             {
                 // 仅在装备状态仍有效且附件仍装备时显示
-                if (bIsEquipped && bLightAttachmentEquipped && LaserDot)
+                if (InventoryItemPayload.IsEquipped && bLightAttachmentEquipped && LaserDot)
                 {
                     LaserDot->SetVisibility(true);
                 }
@@ -691,7 +726,7 @@ void AWeaponBase::ToggleFlashlight(bool bIsAiming)
 {
     if (bIsReloading) return;
     // 必须已装备照明附件
-    if (!bIsEquipped || !bLightAttachmentEquipped) return;
+    if (!InventoryItemPayload.IsEquipped || !bLightAttachmentEquipped) return;
 
     bFlashlightBeamOn = !bFlashlightBeamOn;
     if (FlashlightBeam) FlashlightBeam->SetVisibility(bFlashlightBeamOn);
@@ -711,7 +746,7 @@ void AWeaponBase::ToggleFlashlight(bool bIsAiming)
 
 void AWeaponBase::UpdateLaserTarget()
 {
-    if (!bIsEquipped || !LaserDot) return;
+    if (!InventoryItemPayload.IsEquipped || !LaserDot) return;
 
     // 1. 获取持有者（玩家）的摄像机位置和方向
     AActor* OwnerActor = GetOwner();
@@ -803,7 +838,6 @@ void AWeaponBase::RestoreBaseAttributes()
 
 void AWeaponBase::Drop()
 {
-    if (!bIsEquipped) return;
     if (bIsReloading) StopReload();
     // 从拥有者分离
     DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
@@ -818,7 +852,7 @@ void AWeaponBase::Drop()
     }
 
     SetOwner(nullptr);
-    bIsEquipped = false;
+    InventoryItemPayload.IsEquipped = false;
     CachedHandsMesh = nullptr;
 
     if (bLightAttachmentEquipped)
@@ -832,10 +866,9 @@ void AWeaponBase::Drop()
     }
 }
 
-
 void AWeaponBase::ActivatePooledSmoke()
 {
-    if (!bIsEquipped || !WeaponData->VisualFX.MuzzleSmokeParticle) return;
+    if (!InventoryItemPayload.IsEquipped || !WeaponData->VisualFX.MuzzleSmokeParticle) return;
 
     for (UParticleSystemComponent* SmokeComp : MuzzleSmokePool)
     {
@@ -1145,4 +1178,22 @@ void AWeaponBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     Super::EndPlay(EndPlayReason);
     ClearMuzzleSmokePool();
+}
+
+void AWeaponBase::DiscardItemInInventory_Implementation(int32 Quantity)
+{
+    AZombiePlayer* Player = UInventoryStaticFunctions::GetPlayerRef(this);
+    if (!Player) return;
+    AWeaponBase* CurrentEquippedWeapon = Player->GetCurrentWeapon();
+    if (CurrentEquippedWeapon && CurrentEquippedWeapon->InventoryItemPayload.ItemName == InventoryItemPayload.ItemName)
+    {
+        Player->DropWeaponInInventory();
+        return;
+    }
+    
+    AWeaponBase* TargetWeapon = Player->FindWeaponRefByName(InventoryItemPayload.ItemName);
+    if (!TargetWeapon) return;
+    Player->RemoveWeaponRefByName(InventoryItemPayload.ItemName);
+    TargetWeapon->Drop();
+    return;
 }

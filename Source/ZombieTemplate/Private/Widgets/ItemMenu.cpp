@@ -44,7 +44,8 @@ void UItemMenu::InitMenuButtonVisibility(
     bool bSplitEnabled,
     bool bEquipEnabled,
     bool bAttachAttachmentEnabled,
-    bool bDetachAttachmentEnabled
+    bool bDetachAttachmentEnabled,
+    bool IsEquipped
 )
 {
     auto SetButtonVisibility = [this](UMenuButton* Button, bool bIsVisible)
@@ -65,6 +66,7 @@ void UItemMenu::InitMenuButtonVisibility(
     SetButtonVisibility(WBP_AttachAttachment, bAttachAttachmentEnabled);
     SetButtonVisibility(WBP_DetachAttachment, bDetachAttachmentEnabled);
 
+    WBP_Equip->IsEquipped = IsEquipped;
     OnItemActionSelected.AddDynamic(this, &UItemMenu::HandleMenuButtonEvents);
 }
 

@@ -115,6 +115,9 @@ public:
     UPROPERTY(EditAnywhere, Category = "Input")
     UInputAction* IA_Sprint;
 
+    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    void DropWeaponInInventory();
+
 private:
     void Move(const FInputActionValue& Value);
     void MoveEnd();
@@ -188,12 +191,25 @@ public:
 
     FOnTimelineFloat FOVTimelineCallback;
 
+    UPROPERTY()
+    TArray<AWeaponBase*> AllOwnerWeapons;
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
+    void RemoveWeaponRefByName(FString WeaponName);
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
+    AWeaponBase* FindWeaponRefByName(FString WeaponName);
+
     UFUNCTION()
     void UpdateFOV(float Value);
 
     void ClearCurrentWeapon();
 
     void EquipWeaponDirect(AWeaponBase* Weapon);
+
+    UFUNCTION()
+    void RequestToggleWeapon(const FString& WeaponName, bool IsEquipped = false);
+
 private:
     void PlayADSSound(bool bStart);
     void SetAimingState(bool bAiming);
@@ -206,8 +222,22 @@ private:
     float NormalFOV = 70.0f;
     float ADSFOV = 60.0f;
 
+    bool bPendingIsEquipped = false;
+
     UPROPERTY()
     class AWeaponBase* CurrentWeapon = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+    UAnimMontage* EquipMontage;
+
+    UPROPERTY()
+    FString PendingToggleWeaponName;
+
+    UFUNCTION()
+    void OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+    void PerformToggleWeapon(const FString& WeaponName);
+
 #pragma endregion
 
 #pragma region Ammo
@@ -218,6 +248,9 @@ public:
 
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Weapon|Ammo")
     int32 GetWeaponAmmoFromInventory();
+
+    UFUNCTION()
+    void UpdateAllWeaponAmmoWidget();
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Ammo")
     TMap<FString, FString> FindWeaponAmmo;

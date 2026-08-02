@@ -68,7 +68,8 @@ public:
 		bool bSplitEnabled,
 		bool bEquipEnabled,
 		bool bAttachAttachmentEnabled,
-		bool bDetachAttachmentEnabled
+		bool bDetachAttachmentEnabled,
+		bool IsEquipped
 	);
 
 

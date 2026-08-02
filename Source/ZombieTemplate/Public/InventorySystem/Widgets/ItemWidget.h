@@ -201,13 +201,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> CachedMaterial;
 
-	void LoadItemIconAsync();
-	void LoadBulletIconAsync();
 
 
-
-	void OnItemIconLoaded(TSoftObjectPtr<UTexture2D> SoftRef);
-	void OnBulletIconLoaded(TSoftObjectPtr<UTexture2D> SoftRef);
+	void LoadItemIcon();
+	void LoadBulletIcon();
 
 
 };

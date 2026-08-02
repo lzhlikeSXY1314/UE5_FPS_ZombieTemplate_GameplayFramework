@@ -10,6 +10,8 @@
 #include "InventorySystem/Widgets/ItemWidget.h"
 #include "InspectableItem.generated.h"
 
+
+
 UCLASS()
 class ZOMBIETEMPLATE_API AInspectableItem : public AActor, public IInteractable, public ISaveableActor
 {
@@ -24,6 +26,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Save")
 	FName SaveActorID;
+
+
 protected:
 	FTransform OriginalWorldTransform;
 
@@ -73,7 +77,8 @@ public:
 
 //½Ó¿Ú
 
-
+	UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
+    void DiscardItemInInventory(int32 Quantity);
 
 protected:
 	// Called when the game starts or when spawned

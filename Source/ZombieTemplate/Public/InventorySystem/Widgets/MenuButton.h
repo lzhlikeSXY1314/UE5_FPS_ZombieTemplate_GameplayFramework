@@ -81,6 +81,9 @@ public:
     UPROPERTY()
     UItemMenu* ItemMenu;
 
+    UPROPERTY(BlueprintReadOnly, Category = "Menu Button Data")
+    bool IsEquipped = false;
+
     UFUNCTION()
     void SetItemMenu(UItemMenu* InMenu);
 

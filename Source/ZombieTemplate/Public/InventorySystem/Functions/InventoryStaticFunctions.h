@@ -11,6 +11,7 @@
 
 class USoundBase;
 class UInventoryHUDComponent;
+class AZombiePlayer;
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryStaticFunctions : public UBlueprintFunctionLibrary
@@ -33,7 +34,6 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory Static Functions")
 	static int32 GetRow(const int32 ArrayIndex, const int32 Columns);
 
-
-
-
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory", meta = (WorldContext = "WorldContextObject"))
+	static AZombiePlayer* GetPlayerRef(UObject* WorldContextObject);
 };

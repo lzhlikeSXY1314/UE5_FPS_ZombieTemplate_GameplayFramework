@@ -25,6 +25,11 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+    virtual void DiscardItemInInventory_Implementation(int32 Quantity) override;
+  
+
+
     // ---------- 数据资产 ----------
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
     TObjectPtr<UWeaponData> WeaponData;
@@ -32,6 +37,7 @@ public:
     // ---------- 委托 ----------
     UPROPERTY(BlueprintAssignable, Category = "Interact")
     FOnInteract OnInteract;
+
 
 #pragma region SaveActorInterface
 public:
@@ -78,6 +84,11 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     FName AttachSocketName = "ik_RHand_Gun_Sckt";
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    FName AttachBackSocketName = "Backpack_Sckt";
+
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|VFX")
     FName MuzzleSocketName = "Muzzle";
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Components")
@@ -93,14 +104,19 @@ public:
     // ========================================================================
 #pragma region Interaction & Equip State
 public:
-    UPROPERTY(BlueprintReadOnly, Category = "Weapon")
-    bool bIsEquipped = false;
+    bool CanDirEquipped = true;
 
     virtual void OnInteract_Implementation(AActor* Interactor) override;
-    bool IsEquipped() const { return bIsEquipped; }
+
+    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    bool IsEquipped() const { return InventoryItemPayload.IsEquipped; }
 
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void Equip(AActor* NewOwner);
+
+    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    void UnEquip(AActor* NewOwner);
+
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void Drop();
 #pragma endregion
@@ -127,6 +143,7 @@ public:
     void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 private:
+    
     bool bLastIsEmpty = false;
     void CheckAmmoStateChange();
 #pragma endregion

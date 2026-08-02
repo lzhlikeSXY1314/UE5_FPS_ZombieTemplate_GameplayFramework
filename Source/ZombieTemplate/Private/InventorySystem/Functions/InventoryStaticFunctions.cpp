@@ -7,6 +7,7 @@
 #include <ZombieGameInstance.h>
 #include "InventorySystem/Components/InventoryHUDComponent.h"
 #include "GameFramework/Character.h"
+#include "Characters/ZombiePlayer.h"
 
 UInventoryData* UInventoryStaticFunctions::GetInventoryOptions(UObject* WorldContextObject)
 {
@@ -48,4 +49,17 @@ int32 UInventoryStaticFunctions::GetRow(const int32 ArrayIndex, const int32 Colu
 	if (Columns <= 0) return -1;
 	const double TempNum = ArrayIndex / Columns;
 	return UKismetMathLibrary::FTrunc(TempNum);
+}
+
+AZombiePlayer* UInventoryStaticFunctions::GetPlayerRef(UObject* WorldContextObject)
+{
+	if (!WorldContextObject) return nullptr;
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World) return nullptr;
+
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC) return nullptr;
+
+	return Cast<AZombiePlayer>(PC->GetPawn());
 }
