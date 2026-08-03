@@ -38,6 +38,18 @@ struct FInventoryGridConfig
 	TSubclassOf<UInventorySlotWidget> SlotWidgetClass;
 };
 
+USTRUCT(BlueprintType)
+struct FShortcutSlotMaterials
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shortcut Slot")
+	UMaterialInstance* ShortcutSlotMaterialSelected;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shortcut Slot")
+	UMaterialInstance* ShortcutSlotMaterialNotSelected;
+
+};
 
 
 UCLASS()
@@ -63,6 +75,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Item Materials")
 	TMap<EItemBackgroundState, UMaterialInstance*> ItemBackgroundMaterials;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|ShortcutSlot Materials")
+	FShortcutSlotMaterials ShortcutSlotsMaterials;
 };
 
 

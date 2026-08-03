@@ -109,6 +109,8 @@ class UInventorySlotWidget;
 class UInventoryGridPanelWidget;
 class UItemMenu;
 class UItemActionConfirmWidget;
+class UShortcutWidget;
+
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZOMBIETEMPLATE_API UInventoryHUDComponent : public UActorComponent
@@ -495,5 +497,32 @@ private:
 
 #pragma endregion
 
+#pragma region ShortcutWidget
 
+public:
+	UFUNCTION()
+	void CreateShortcutWidget();
+
+	UFUNCTION()
+	void CancelShortcutWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "Shortcut|Function")
+	void LoadShortcutItemData(UShortcutWidget* InShortcutWidget);
+
+	UFUNCTION(BlueprintCallable, Category = "Shortcut|Function")
+	void UpdateItemShortcutIndexByName(FString ItemName, int32 ShortcutIndex);
+
+	UFUNCTION(BlueprintCallable,Category = "Shortcut|Function")
+	void UpdateAllItemWidgetShortcutState(); //用于Shortcut中实时更换背包视觉
+
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UShortcutWidget> ShortcutWidgetClass;
+
+	UPROPERTY()
+	UShortcutWidget* ShortcutWidget = nullptr;
+
+
+
+#pragma endregion
 };

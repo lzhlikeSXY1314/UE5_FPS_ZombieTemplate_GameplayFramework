@@ -46,23 +46,6 @@ void UItemWidget::SelectItemBackgroundMaterial(bool bIsSelected, bool bIsOpenMen
 }
 
 
-//void UItemWidget::LoadBulletIconAsync()
-//{
-//    if (!BulletImage) return;
-//    TSoftObjectPtr<UTexture2D> SoftRef = InventoryItemPayload.BulletIconSoftRef;
-//    if (!SoftRef.IsValid())
-//    {
-//        BulletImage->SetBrushFromTexture(nullptr);
-//        return;
-//    }
-//    FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-//    Streamable.RequestAsyncLoad(
-//        SoftRef.ToSoftObjectPath(),
-//        FStreamableDelegate::CreateUObject(this, &UItemWidget::OnBulletIconLoaded, SoftRef)
-//    );
-//
-//}
-
 void UItemWidget::SetAmount()
 {
     //if (!Amount_Text) return;
@@ -115,6 +98,10 @@ void UItemWidget::PlayRotationToDefaultAnimation_Implementation()
 }
 
 void UItemWidget::HideInfoOverlayAnimation_Implementation()
+{
+}
+
+void UItemWidget::UpdateKeyImageInfo_Implementation(bool Show, bool IsEquipped, int32 Index)
 {
 }
 

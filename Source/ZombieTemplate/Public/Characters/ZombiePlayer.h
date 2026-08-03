@@ -9,6 +9,7 @@
 //#include <ContextualAnimSceneActorComponent.h>
 #include "ZombiePlayer.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponFired);
 
 class UInputAction;
 class UInputMappingContext;
@@ -60,12 +61,21 @@ protected:
     bool InitializeFinish = false;
 
 #pragma region UI
+public:
+
+    UPROPERTY(BlueprintAssignable, Category = "Weapon|Events")
+    FOnWeaponFired OnWeaponFired;
+
+    UPROPERTY(BlueprintReadOnly, Category = "UI")
+    UUserWidget* CrosshairWidget;
+
 private:
+
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSubclassOf<UUserWidget> CrosshairWidgetClass;
 
-    UPROPERTY()
-    UUserWidget* CrosshairWidget;
+
+
 #pragma endregion
 
 #pragma region InputHandlers
@@ -191,7 +201,7 @@ public:
 
     FOnTimelineFloat FOVTimelineCallback;
 
-    UPROPERTY()
+    UPROPERTY(BlueprintReadOnly, Category = "Inventory|Weapon")
     TArray<AWeaponBase*> AllOwnerWeapons;
 
     UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
@@ -207,7 +217,7 @@ public:
 
     void EquipWeaponDirect(AWeaponBase* Weapon);
 
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
     void RequestToggleWeapon(const FString& WeaponName, bool IsEquipped = false);
 
 private:
@@ -233,9 +243,6 @@ private:
     UPROPERTY()
     FString PendingToggleWeaponName;
 
-    UFUNCTION()
-    void OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted);
-
     void PerformToggleWeapon(const FString& WeaponName);
 
 #pragma endregion
@@ -256,7 +263,6 @@ public:
     TMap<FString, FString> FindWeaponAmmo;
 
 #pragma endregion
-
 
 #pragma region Health
     public:
@@ -281,8 +287,6 @@ public:
         /** ÷ÿ–¥ TakeDamage ¥¶¿Ì…À∫¶ */
         virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, class AActor* DamageCauser) override;
 #pragma endregion
-
-
 
 #pragma region CameraShake
 public:

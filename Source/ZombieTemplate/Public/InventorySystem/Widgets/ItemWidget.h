@@ -62,6 +62,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	bool CanBePickedToInventory = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	int32 ShortcutIndex = -1;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	bool CanDestory = false;
@@ -129,14 +132,12 @@ public:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> BulletImage;
 
-	//UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
-	//TObjectPtr<UTextBlock> Amount_Text;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
 	TObjectPtr<UWidgetSwitcher> WidgetSwitcher_Equip;
 
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UImage> KeyImage;
+	//UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
+	//TObjectPtr<UImage> KeyImage;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> EquippedImage;
@@ -144,7 +145,7 @@ public:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<USizeBox> SizeBox_Root;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
 	TObjectPtr<USizeBox> SizeBox_ItemShortcut;
 
 	UPROPERTY(meta = (BindWidgetOptional))
@@ -193,6 +194,11 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
 	void HideInfoOverlayAnimation();
 	virtual void HideInfoOverlayAnimation_Implementation();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget|Animation")
+	void UpdateKeyImageInfo(bool Show, bool IsEquipped, int32 Index);
+	virtual void UpdateKeyImageInfo_Implementation(bool Show, bool IsEquipped, int32 Index);
+
 
 	UPROPERTY(BlueprintAssignable, Category = "ItemWIdget|Delegate")
 	FOnAmountChange OnAmountChange;

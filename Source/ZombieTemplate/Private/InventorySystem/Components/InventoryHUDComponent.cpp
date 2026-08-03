@@ -21,7 +21,7 @@
 #include "InventorySystem/Widgets/ItemActionConfirmWidget.h"
 #include "Characters/ZombiePlayer.h"
 #include "Items/WeaponBase.h"
-
+#include "Widgets/ShortcutWidget.h"
 
 void UInventoryHUDComponent::BeginPlay()
 {
@@ -132,12 +132,20 @@ void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
             return;
         }
 
+        if (ShortcutWidget)
+        {
+            CancelShortcutWidget();
+            return;
+        }
+
         if (InventoryWidget)
         {
             InventoryWidget->ShowHideTempSlots(false);
             InventoryWidget->CloseInventory();
             return;
         }
+
+
     }
 
   
@@ -175,6 +183,7 @@ void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, b
 {
     if (ItemMenuWidget) return;
     if (ConfirmWidget) return;
+    if (ShortcutWidget) return;
 
     if (DragWidget)
     {
@@ -386,11 +395,11 @@ void UInventoryHUDComponent::DestroyAllTempObjects()
     if (ItemMenuWidget) ItemMenuWidget->RemoveFromParent();
     ItemMenuWidget = nullptr;
 
-    if (ConfirmWidget)
-    {
-        ConfirmWidget->RemoveFromParent();
-    }
+    if (ConfirmWidget) ConfirmWidget->RemoveFromParent();
     ConfirmWidget = nullptr;
+
+    if(ShortcutWidget)  ShortcutWidget->RemoveFromParent();
+    ShortcutWidget = nullptr;
 }
 
 void UInventoryHUDComponent::InitializeSlots()
@@ -889,6 +898,7 @@ void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, E_Slots
     NewItemWidget->DefaultRotation = Item->InventoryItemPayload.Rotation;
     NewItemWidget->Rotation = Item->InventoryItemPayload.Rotation;
     NewItemWidget->SetItemWidgetAspectRatio();
+    NewItemWidget->UpdateKeyImageInfo(NewItemWidget->InventoryItemPayload.ShortcutIndex >= 0, NewItemWidget->InventoryItemPayload.IsEquipped, NewItemWidget->InventoryItemPayload.ShortcutIndex);
 
     ItemsWidgets.Add(NewItemWidget);
 
@@ -946,6 +956,7 @@ void UInventoryHUDComponent::InitializeDragWidget()
         NewItemWidget->InventoryItemPayload = ItemWidget->InventoryItemPayload;
         NewItemWidget->DefaultRotation = ItemWidget->InventoryItemPayload.Rotation;
         NewItemWidget->Rotation = ItemWidget->InventoryItemPayload.Rotation;
+        NewItemWidget->UpdateKeyImageInfo(NewItemWidget->InventoryItemPayload.ShortcutIndex >= 0, NewItemWidget->InventoryItemPayload.IsEquipped, NewItemWidget->InventoryItemPayload.ShortcutIndex);
 
         //获取从被点击的单元格到槽位项第一个单元格的偏移量
         int32 RealSelectedIndex = SlotInfo.Index;
@@ -1519,6 +1530,7 @@ void UInventoryHUDComponent::CreateSwapItemWidget(AInspectableItem* ItemUnderDra
     NewItemWidget->DefaultRotation = ItemWidget->InventoryItemPayload.Rotation;
     NewItemWidget->InventoryItemPayload.SlotsType = E_SlotsType::HiddenSlots; //不可缺
     NewItemWidget->InventoryItemPayload.OccupiedSlots = { 0 };//不可缺
+    NewItemWidget->UpdateKeyImageInfo(NewItemWidget->InventoryItemPayload.ShortcutIndex >= 0, NewItemWidget->InventoryItemPayload.IsEquipped, NewItemWidget->InventoryItemPayload.ShortcutIndex);
 
     if (!NewItemWidget) return;
     NewItemWidget->SetItemWidgetAspectRatio();
@@ -1937,12 +1949,19 @@ void UInventoryHUDComponent::UpdateControlHints(EInventoryStatus InStatus)
             return;
         }
 
+        if (ShortcutWidget)
+        {
+            InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::Shortcut);
+            return;
+        }
+
         if (ItemMenuWidget)
         {
             InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::Menu);
             return;
         }
-   
+
+
         InventoryWidget->WB_ControlHints->UpdateControlHint(InStatus);
         return;
     }
@@ -1986,6 +2005,7 @@ TArray<AInspectableItem*> UInventoryHUDComponent::GetAllShortcutItems()
 
 void UInventoryHUDComponent::AutoSort()
 {
+    if (ShortcutWidget) return;
     if (DragWidget) return;
     if (IsSlotsHaveItems(E_SlotsType::Temp)) return;
     TArray<AInspectableItem*> Items;
@@ -2099,8 +2119,10 @@ void UInventoryHUDComponent::AutoSort()
 
 void UInventoryHUDComponent::CreateItemMenuWidget()
 {
+    if (ShortcutWidget) return;
+
     if (IsSlotsHaveItems(E_SlotsType::Temp) || IsValidSwappedItem()) return;
-   
+
     AInspectableItem* SelectItem = nullptr;
 
     if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
@@ -2217,8 +2239,16 @@ void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionT
         }
         Player->RequestToggleWeapon(Item->InventoryItemPayload.ItemName, Item->InventoryItemPayload.IsEquipped);
     }
-}
 
+    if (ActionType == E_ItemActionType::Shortcut)
+    {
+        bIgnoreMouseUp = true;
+        CloseItemMenuWidget();
+        CreateShortcutWidget();
+        return;
+    }
+
+}
 
 void UInventoryHUDComponent::CreateItemActionConfirmWidget(AInspectableItem* Item, bool ShowNumBlock, int32 InMaxValue, E_ItemActionType ActionType, bool ShowMsg)
 {
@@ -2399,7 +2429,7 @@ void UInventoryHUDComponent::UpdateEquipStateByName(const FString& ItemName, boo
     {
         if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
         {
-            Slot.ItemReference->InventoryItemPayload.IsEquipped = ClearAllWeaponState ? false: true;           
+            Slot.ItemReference->InventoryItemPayload.IsEquipped = ClearAllWeaponState ? false: true;  
         }
         else if(!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName != ItemName)
         {
@@ -2420,9 +2450,118 @@ void UInventoryHUDComponent::UpdateAllWeaponWidgetAmmoByName(const FString& Item
     }
 }
 
+void UInventoryHUDComponent::CreateShortcutWidget()
+{
+    if (GetSlots(CreateMenuInfo.Type).IsValidIndex(CreateMenuInfo.Index))
+    {
+        AInspectableItem* Item = GetSlots(CreateMenuInfo.Type)[CreateMenuInfo.Index].ItemReference;
+        if (!Item) return;
+        APlayerController* PC = GetPlayerController();
+        if (!PC) return;
+        UShortcutWidget* NewShortcutWidget = CreateWidget<UShortcutWidget>(PC, ShortcutWidgetClass);
 
+        if (!NewShortcutWidget) return;
+        NewShortcutWidget->ItemData = Item->InventoryItemPayload;
 
+        if (InventoryWidget && InventoryWidget->CanvasPanel_Root)
+        {
+            UCanvasPanelSlot* Slot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(NewShortcutWidget);
+            Slot->SetAutoSize(true);
+            Slot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+            Slot->SetOffsets(0.0f);
+            ShortcutWidget = NewShortcutWidget;
+            LoadShortcutItemData(ShortcutWidget);
+            ShortcutWidget->LoadShortcutItemData();
+            UpdateControlHints(EInventoryStatus::Shortcut);
+            return;
+        }
+    }
+}
 
+void UInventoryHUDComponent::CancelShortcutWidget()
+{
+    if (ShortcutWidget)
+    {
+        ShortcutWidget->RemoveFromParent();
+        ShortcutWidget = nullptr;
+        UpdateControlHints(EInventoryStatus::Opened);
+        SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+        PlayInventorySound(E_InventorySoundType::CloseShortcuts);
+    }
+}
+
+void UInventoryHUDComponent::LoadShortcutItemData(UShortcutWidget* InShortcutWidget)
+{
+    if (!IsValid(InShortcutWidget)) return;
+    InShortcutWidget->ShortcutItemMap.Empty();
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference))
+        {
+            const FInventoryItemPayload& Payload = Slot.ItemReference->InventoryItemPayload;
+
+            if (Payload.ShortcutIndex >= 0 && Payload.ShortcutIndex <= 3)
+            {
+                InShortcutWidget->ShortcutItemMap.Emplace(Payload.ShortcutIndex, Payload);
+            }
+        }
+    }
+
+}
+
+void UInventoryHUDComponent::UpdateItemShortcutIndexByName(FString ItemName, int32 ShortcutIndex)
+{
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (!Slot.IsEmpty && !Slot.IsPartOfItem && IsValid(Slot.ItemReference) && Slot.ItemReference->InventoryItemPayload.ItemName == ItemName)
+        {
+            Slot.ItemReference->InventoryItemPayload.ShortcutIndex = ShortcutIndex;
+        }
+    }
+}
+
+void UInventoryHUDComponent::UpdateAllItemWidgetShortcutState()
+{
+    // 1. 先构建 ItemName -> ItemWidget 的快速映射
+    TMap<FString, UItemWidget*> ItemWidgetMap;
+    ItemWidgetMap.Reserve(ItemsWidgets.Num());
+
+    for (UItemWidget* Widget : ItemsWidgets)
+    {
+        if (IsValid(Widget) && !Widget->InventoryItemPayload.ItemName.IsEmpty())
+        {
+            ItemWidgetMap.Emplace(Widget->InventoryItemPayload.ItemName, Widget);
+        }
+    }
+
+    // 2. 遍历槽，直接查表，单层循环 O(n)
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (Slot.IsEmpty || Slot.IsPartOfItem || !IsValid(Slot.ItemReference))
+        {
+            continue;
+        }
+
+        const FInventoryItemPayload& Payload = Slot.ItemReference->InventoryItemPayload;
+        const FString& ItemName = Payload.ItemName;
+
+        // 直接查找，速度极快
+        if (UItemWidget** FoundWidget = ItemWidgetMap.Find(ItemName))
+        {
+            if (IsValid(*FoundWidget))
+            {
+                (*FoundWidget)->UpdateKeyImageInfo(
+                    Payload.ShortcutIndex >= 0,
+                    Payload.IsEquipped,
+                    Payload.ShortcutIndex
+                );
+            }
+        }
+    }
+}
 
 
 

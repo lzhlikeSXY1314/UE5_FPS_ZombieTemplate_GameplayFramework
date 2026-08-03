@@ -72,5 +72,6 @@ enum class EInventoryStatus : uint8
     Closed,
     Draged,
     HasItemInTemp,
-    Menu
+    Menu,
+    Shortcut
 };

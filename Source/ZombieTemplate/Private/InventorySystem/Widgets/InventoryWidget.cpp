@@ -6,6 +6,7 @@
 #include "InventorySystem/Widgets/InventoryGridPanelWidget.h"
 #include "InventorySystem/Functions/InventoryStaticFunctions.h"
 #include "InventorySystem/Components/InventoryHUDComponent.h"
+#include "Widgets/ShortcutWidget.h"
 
 void UInventoryWidget::NativeConstruct()
 {
@@ -58,6 +59,17 @@ FReply UInventoryWidget::NativeOnKeyDown(const FGeometry& MyGeometry, const FKey
         return FReply::Handled();
     }
 
+
+    if (PressedKey == EKeys::R)
+    {
+        UInventoryHUDComponent* HUDComp = UInventoryStaticFunctions::GetInventoryHUDComponent(this);
+
+        if (HUDComp->ShortcutWidget)
+        {
+            HUDComp->ShortcutWidget->RomoveShortcutItemData();
+            return FReply::Handled();
+        }
+    }
 
     return Super::NativeOnKeyDown(MyGeometry, InKeyEvent);
 }

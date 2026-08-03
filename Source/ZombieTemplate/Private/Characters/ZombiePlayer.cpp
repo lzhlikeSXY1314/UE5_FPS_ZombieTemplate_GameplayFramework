@@ -229,6 +229,8 @@ void AZombiePlayer::PerformFireTrace()
 {
     if (!CurrentWeapon || CurrentWeapon->bIsReloading) return;
 
+
+
     // 空仓检查：如果弹药为0，播放空仓音效并退出（不消耗后备，也不开火）
     if (CurrentWeapon->InventoryItemPayload.AmmoAmount <= 0)
     {
@@ -320,6 +322,7 @@ void AZombiePlayer::PerformFireTrace()
 
     // 消耗弹药
     CurrentWeapon->ConsumeAmmo();
+    OnWeaponFired.Broadcast();
 }
 
 bool AZombiePlayer::CanAim(AActor* Target) const
@@ -499,14 +502,8 @@ void AZombiePlayer::RequestToggleWeapon(const FString& WeaponName, bool IsEquipp
         if (AnimInstance)
         {
             AnimInstance->StopAllMontages(0.0);
-            // 播放蒙太奇并设置结束回调
             AnimInstance->Montage_Play(EquipMontage);
-            // 绑定结束委托
-            FOnMontageEnded MontageEndedDelegate;
-            MontageEndedDelegate.BindUObject(this, &AZombiePlayer::OnEquipMontageEnded);
-
-            AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, EquipMontage);
-
+            PerformToggleWeapon(WeaponName);
         }
     }
     else
@@ -517,12 +514,6 @@ void AZombiePlayer::RequestToggleWeapon(const FString& WeaponName, bool IsEquipp
 
 }
 
-void AZombiePlayer::OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-    PerformToggleWeapon(PendingToggleWeaponName);
-    PendingToggleWeaponName.Empty();
-    bPendingIsEquipped = false;
-}
 
 void AZombiePlayer::PerformToggleWeapon(const FString& WeaponName)
 {
