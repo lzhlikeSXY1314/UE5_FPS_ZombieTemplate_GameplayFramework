@@ -68,6 +68,10 @@ public:
 	void ShowHideTempAnim(bool ShowTemp);
 	virtual void ShowHideTempAnim_Implementation(bool ShowTemp);
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Item Widget")
+	void ShowHideInventoryToInspectItemWidget(bool Show);
+	virtual void ShowHideInventoryToInspectItemWidget_Implementation(bool ShowTemp);
+
 	UFUNCTION(BlueprintCallable)
 	void ShowHideTempSlots(bool Show = false);
 

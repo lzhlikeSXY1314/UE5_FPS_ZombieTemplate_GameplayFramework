@@ -110,6 +110,8 @@ class UInventoryGridPanelWidget;
 class UItemMenu;
 class UItemActionConfirmWidget;
 class UShortcutWidget;
+class UInspectItemWidget;
+class AInspectItem;
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -172,6 +174,10 @@ public:
 
 	UFUNCTION()
 	void SetRealSelectedSlot(int32 InIndex, E_SlotsType InSlotType);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
+	UInventoryWidget* GetInventoryWidget() { return InventoryWidget; }
+
 #pragma region Delegate
 public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Drag")
@@ -319,7 +325,6 @@ public:
 
 
 #pragma endregion
-
 
 #pragma region DragWidget
 
@@ -525,4 +530,29 @@ public:
 
 
 #pragma endregion
+
+#pragma region InspectItemWidget
+
+public:
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UInspectItemWidget> InspectItemWidgetClass;
+
+	UPROPERTY()
+	UInspectItemWidget* InspectItemWidget = nullptr;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<AInspectItem> InspectItemClass;
+
+	UPROPERTY()
+	AInspectItem* InspectItem = nullptr;
+
+	UFUNCTION()
+	void DestroyInspectItem();
+
+	UFUNCTION()
+	void InitializeInspectItem(AInspectableItem* Item);
+
+#pragma endregion
+
+
 };

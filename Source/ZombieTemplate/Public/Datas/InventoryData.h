@@ -51,6 +51,29 @@ struct FShortcutSlotMaterials
 
 };
 
+USTRUCT(BlueprintType)
+struct FInspectItemConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	float ItemRotateSpeed = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	float ItemMovementSpeed = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	float ItemZoomSpeed = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	bool CanRotate = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	bool CanMove = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "InspectItem")
+	bool CanZoom = true;
+};
 
 UCLASS()
 class ZOMBIETEMPLATE_API UInventoryData : public UPrimaryDataAsset
@@ -66,6 +89,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Temp", meta = (EditCondition = "bEnableTempSlots", EditConditionHides))
 	FInventoryGridConfig TempConfig;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|InspectItem")
+	FInspectItemConfig InspectItemConfig;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid", meta = (ClampMin = "20.0", ClampMax = "200.0"))
 	float SlotSize = 80.f;

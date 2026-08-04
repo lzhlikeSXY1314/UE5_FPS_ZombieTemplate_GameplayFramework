@@ -36,13 +36,17 @@ public:
 
 
 
-    UPROPERTY(VisibleAnywhere, Category = Camera)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
     class UCameraComponent* FPS_Camera;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
+    class UCameraComponent* FPS_InspectItemCamera;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
     USkeletalMeshComponent* FPSSkeletalMesh;
 
-
+    UFUNCTION(BlueprintCallable, Category = "Camera")
+    void ToggleInspectCamera(bool bEnableInspect);
 
     UPROPERTY(BlueprintReadOnly, Category = "Animation")
     EPlayerAnimState CurrentAnimState = EPlayerAnimState::NoWeapon_AnimState;
@@ -52,6 +56,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void PlayPickUpMontage();
+
+
+
 
 protected:
     virtual void BeginPlay() override;

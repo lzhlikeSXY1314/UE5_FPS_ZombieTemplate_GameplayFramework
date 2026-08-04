@@ -8,7 +8,7 @@ public class ZombieTemplate : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "DismembermentSystem" , "AIModule" ,"SkinnedDecalComponent" ,"UMG", "SlateCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "DismembermentSystem" , "AIModule" ,"SkinnedDecalComponent" ,"UMG", "SlateCore"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

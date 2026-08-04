@@ -73,5 +73,6 @@ enum class EInventoryStatus : uint8
     Draged,
     HasItemInTemp,
     Menu,
-    Shortcut
+    Shortcut,
+    InspectItem
 };

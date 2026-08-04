@@ -37,6 +37,10 @@ AZombiePlayer::AZombiePlayer()
     FPS_Camera->SetFieldOfView(70.0f);
     FPS_Camera->bUsePawnControlRotation = true;
 
+    FPS_InspectItemCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FPS_InspectItemCamera"));
+    FPS_InspectItemCamera->SetupAttachment(RootComponent); 
+    
+
     FPSSkeletalMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FPSSkeletalMesh"));
     FPSSkeletalMesh->SetupAttachment(FPS_Camera);
     FPSSkeletalMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -165.5f));
@@ -63,6 +67,8 @@ AZombiePlayer::AZombiePlayer()
 
     //库存组件
     InventoryComponent = CreateDefaultSubobject<UInventoryHUDComponent>(TEXT("InventoryComponent"));
+
+
 
 }
 
@@ -122,6 +128,41 @@ void AZombiePlayer::Tick(float DeltaTime)
     UpdateCameraShake();
 
 }
+
+void AZombiePlayer::ToggleInspectCamera(bool bEnableInspect)
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+
+    FPS_InspectItemCamera->SetActive(bEnableInspect);
+    FPS_Camera->SetActive(!bEnableInspect);
+
+    bool bWasPaused = UGameplayStatics::IsGamePaused(GetWorld());
+
+    if (bWasPaused)
+    {
+        UGameplayStatics::SetGamePaused(GetWorld(), false);
+    }
+
+
+    PC->SetViewTarget(this);
+
+    if (bWasPaused)
+    {
+        FTimerHandle ResumeTimerHandle;
+        GetWorld()->GetTimerManager().SetTimer(
+            ResumeTimerHandle,
+            [this]()
+            {
+                UGameplayStatics::SetGamePaused(GetWorld(), true);
+            },
+            0.05f,
+            false
+        );
+    }
+}
+
+
 
 // Called to bind functionality to input
 void AZombiePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -434,8 +475,6 @@ void AZombiePlayer::EquipWeaponDirect(AWeaponBase* Weapon)
     }
 }
 
-
-
 void AZombiePlayer::UpdateArmsFromFOV(float FOVValue)
 {
     if (!FPSSkeletalMesh || !CurrentWeapon || !CurrentWeapon->ScopeMesh || !CurrentWeapon->bScopeEquipped) return;
@@ -485,7 +524,6 @@ float AZombiePlayer::CalculateDamage(float Distance, FName BoneName) const
 
 }
 
-
 void AZombiePlayer::RequestToggleWeapon(const FString& WeaponName, bool IsEquipped)
 {
     if (!FindWeaponRefByName(WeaponName)) return;
@@ -513,7 +551,6 @@ void AZombiePlayer::RequestToggleWeapon(const FString& WeaponName, bool IsEquipp
     }
 
 }
-
 
 void AZombiePlayer::PerformToggleWeapon(const FString& WeaponName)
 {
@@ -581,6 +618,7 @@ void AZombiePlayer::UpdateAllWeaponAmmoWidget()
         InventoryComponent->UpdateAllWeaponWidgetAmmoByName(Weapon->InventoryItemPayload.ItemName, Weapon->InventoryItemPayload.AmmoAmount);
     }
 }
+
 
 void AZombiePlayer::PlayPickUpMontage()
 {

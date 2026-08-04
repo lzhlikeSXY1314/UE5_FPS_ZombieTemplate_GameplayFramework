@@ -22,6 +22,7 @@
 #include "Characters/ZombiePlayer.h"
 #include "Items/WeaponBase.h"
 #include "Widgets/ShortcutWidget.h"
+#include "InventorySystem/Widgets/InspectItemWidget.h"
 
 void UInventoryHUDComponent::BeginPlay()
 {
@@ -120,6 +121,13 @@ void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
 {
     if (InKey == EKeys::RightMouseButton)
     {
+
+        if (InspectItemWidget)
+        {
+            DestroyInspectItem();
+            return;
+        }
+
         if (DragWidget)
         {
             RotateItemWidget(true);
@@ -144,6 +152,8 @@ void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
             InventoryWidget->CloseInventory();
             return;
         }
+
+
 
 
     }
@@ -400,6 +410,12 @@ void UInventoryHUDComponent::DestroyAllTempObjects()
 
     if(ShortcutWidget)  ShortcutWidget->RemoveFromParent();
     ShortcutWidget = nullptr;
+
+    if (InspectItemWidget) InspectItemWidget->RemoveFromParent();
+    if (InspectItem) InspectItem->Destroy();
+    InspectItem = nullptr;
+    InspectItemWidget = nullptr;
+
 }
 
 void UInventoryHUDComponent::InitializeSlots()
@@ -1961,6 +1977,12 @@ void UInventoryHUDComponent::UpdateControlHints(EInventoryStatus InStatus)
             return;
         }
 
+        if (InspectItemWidget)
+        {
+            InventoryWidget->WB_ControlHints->UpdateControlHint(EInventoryStatus::InspectItem);
+            return;
+        }
+
 
         InventoryWidget->WB_ControlHints->UpdateControlHint(InStatus);
         return;
@@ -2246,6 +2268,15 @@ void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionT
         CloseItemMenuWidget();
         CreateShortcutWidget();
         return;
+    }
+
+    if (ActionType == E_ItemActionType::Inspect)
+    {
+        CloseItemMenuWidget(false);
+        AInspectableItem* Item = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+        if (!Item) return;
+        InitializeInspectItem(Item);
+        PlayInventorySound(E_InventorySoundType::PickupItem);
     }
 
 }
@@ -2561,6 +2592,55 @@ void UInventoryHUDComponent::UpdateAllItemWidgetShortcutState()
             }
         }
     }
+}
+
+void UInventoryHUDComponent::DestroyInspectItem()
+{
+    if (InspectItemWidget)
+    {
+        InspectItemWidget->RemoveFromParent();
+        PlayInventorySound(E_InventorySoundType::PickupItem);
+    }
+
+    if (InspectItem) InspectItem->Destroy();
+    InspectItem = nullptr;
+    InspectItemWidget = nullptr;
+
+    if (InventoryWidget)
+    {
+        UpdateControlHints(EInventoryStatus::Opened);
+        InventoryWidget->ShowHideInventoryToInspectItemWidget(true);
+        SetNameAndDescriptionText(FText::GetEmpty(), FText::GetEmpty());
+    }
+     
+}
+
+void UInventoryHUDComponent::InitializeInspectItem(AInspectableItem* Item)
+{
+    DestroyInspectItem();
+
+    FTransform SpawnTransform(FQuat::Identity, FVector(0, 0, 5000), FVector(1, 1, 1));
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    AInspectItem* SpawnedInspectItem = GetWorld()->SpawnActor<AInspectItem>(InspectItemClass, SpawnTransform, SpawnParams);
+    SpawnedInspectItem->InitItemExamine(Item->InventoryItemPayload.ExamineConfig);
+
+    InspectItem = SpawnedInspectItem;
+
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+
+    UInspectItemWidget* NewInspectItemWidget = CreateWidget<UInspectItemWidget>(PC, InspectItemWidgetClass);
+    NewInspectItemWidget->AddToViewport();
+    NewInspectItemWidget->InspectItem = SpawnedInspectItem;
+
+    if (InventoryWidget) InventoryWidget->ShowHideInventoryToInspectItemWidget(false);
+
+    InspectItemWidget = NewInspectItemWidget;
+    InspectItemWidget->SetFocus();
+
+    UpdateControlHints(EInventoryStatus::InspectItem); 
+   
 }
 
 

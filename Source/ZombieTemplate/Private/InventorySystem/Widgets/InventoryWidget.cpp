@@ -132,6 +132,10 @@ void UInventoryWidget::ShowHideTempAnim_Implementation(bool ShowTemp)
 {
 }
 
+void UInventoryWidget::ShowHideInventoryToInspectItemWidget_Implementation(bool ShowTemp)
+{
+}
+
 void UInventoryWidget::ShowHideTempSlots(bool Show)
 {
     if (WB_Temp)

@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include"InventorySystem/Structs/InventoryTypes.h"
 
+#include "InventorySystem/Actors/InspectItem.h"
 #include "ItemWidget.generated.h"
 
 class UImage;
@@ -15,6 +16,7 @@ class USizeBox;
 class UInventoryHUDComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAmountChange, int32, InAmount);
+
 
 
 // 核心物品数据结构体
@@ -111,6 +113,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
 	bool bDetachAttachmentEnabled = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	FItemExamineSettings ExamineConfig;
+
 };
 
 
@@ -135,9 +140,6 @@ public:
 
 	UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
 	TObjectPtr<UWidgetSwitcher> WidgetSwitcher_Equip;
-
-	//UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional))
-	//TObjectPtr<UImage> KeyImage;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> EquippedImage;
