@@ -7,7 +7,9 @@
 #include"InventorySystem/Structs/InventoryTypes.h"
 
 #include "InventorySystem/Actors/InspectItem.h"
+#include <GameplayTagContainer.h>
 #include "ItemWidget.generated.h"
+
 
 class UImage;
 class UTextBlock;
@@ -97,6 +99,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
 	bool bCombineEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Combine", meta = (EditCondition = "bCombineEnabled"))
+	FGameplayTagContainer CombineTags;
+
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data|Menu Button")
 	bool bDiscardEnabled = false;

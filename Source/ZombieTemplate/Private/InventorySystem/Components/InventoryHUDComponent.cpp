@@ -23,6 +23,8 @@
 #include "Items/WeaponBase.h"
 #include "Widgets/ShortcutWidget.h"
 #include "InventorySystem/Widgets/InspectItemWidget.h"
+#include "InventorySystem/Widgets/HerbCombineMenu.h"
+
 
 void UInventoryHUDComponent::BeginPlay()
 {
@@ -146,6 +148,12 @@ void UInventoryHUDComponent::OnMouseButtonDown(FKey InKey)
             return;
         }
 
+        if (HerbCombineMenuWidget)
+        {
+            CloseHerbCombineMenuWidget();
+            return;
+        }
+
         if (InventoryWidget)
         {
             InventoryWidget->ShowHideTempSlots(false);
@@ -194,6 +202,7 @@ void UInventoryHUDComponent::SelectSlot(int32 InIndex, E_SlotsType InSlotType, b
     if (ItemMenuWidget) return;
     if (ConfirmWidget) return;
     if (ShortcutWidget) return;
+    if (HerbCombineMenuWidget) return;
 
     if (DragWidget)
     {
@@ -415,6 +424,8 @@ void UInventoryHUDComponent::DestroyAllTempObjects()
     if (InspectItem) InspectItem->Destroy();
     InspectItem = nullptr;
     InspectItemWidget = nullptr;
+
+    if (HerbCombineMenuWidget) CloseHerbCombineMenuWidget();
 
 }
 
@@ -940,6 +951,7 @@ void UInventoryHUDComponent::AddItemWidgetToGrib(AInspectableItem* Item, E_Slots
 /// <DragWidget>
 void UInventoryHUDComponent::InitializeDragWidget()
 {
+
     FSlotInfo SlotInfo = GetRealSelectedSlot();
     UItemWidget* ItemWidget = GetItemWidgetByIndex(SlotInfo.Index, SlotInfo.Type);
     if (!ItemWidget) return;
@@ -1363,9 +1375,12 @@ void UInventoryHUDComponent::CancelDrag(bool InPlaySound)
 
 }
 
-
 void UInventoryHUDComponent::HandleDragDetected()
 {
+    if (HerbCombineMenuWidget) return;
+    if (ItemMenuWidget) return;
+
+
     if (IsValid(DragWidget))
     {
         MoveItem();
@@ -1393,9 +1408,6 @@ void UInventoryHUDComponent::HandleDragDetected()
 
 
 }
-
-
-/// </DragWidget>
 
 bool UInventoryHUDComponent::IsEmptySlotsForItem(const int32 Index, const int32 Width, const int32 Height, const E_SlotsType SlotType, const EItemRotation Rotation, TArray<int32>& EmptySlots, const TArray<int32>& ExcludeSlots)
 {
@@ -2142,6 +2154,7 @@ void UInventoryHUDComponent::AutoSort()
 void UInventoryHUDComponent::CreateItemMenuWidget()
 {
     if (ShortcutWidget) return;
+    if (HerbCombineMenuWidget) return;
 
     if (IsSlotsHaveItems(E_SlotsType::Temp) || IsValidSwappedItem()) return;
 
@@ -2279,6 +2292,18 @@ void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionT
         PlayInventorySound(E_InventorySoundType::PickupItem);
     }
 
+    if (ActionType == E_ItemActionType::Combine)
+    {
+        if (ItemMenuWidget)
+        {
+            ItemMenuWidget->RemoveFromParent();
+            ItemMenuWidget = nullptr;
+        }
+        CreateHerbCombineMenuWidget();
+        PlayInventorySound(E_InventorySoundType::OpenMenu);
+        return;
+    }
+
 }
 
 void UInventoryHUDComponent::CreateItemActionConfirmWidget(AInspectableItem* Item, bool ShowNumBlock, int32 InMaxValue, E_ItemActionType ActionType, bool ShowMsg)
@@ -2340,6 +2365,8 @@ void UInventoryHUDComponent::ComfirmationMes(bool InYes, E_ItemActionType Action
         ConfirmWidget = nullptr;
         return;
     }
+
+
 
 }
 
@@ -2642,6 +2669,340 @@ void UInventoryHUDComponent::InitializeInspectItem(AInspectableItem* Item)
     UpdateControlHints(EInventoryStatus::InspectItem); 
    
 }
+
+void UInventoryHUDComponent::CreateHerbCombineMenuWidget()
+{
+    if (HerbCombineMenuWidget) return;
+    AInspectableItem* SelectItem = nullptr;
+    if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
+    {
+        SelectItem = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+    }
+    if (!SelectItem) return;
+    if (!HerbCombineMenuClass) return;
+
+    APlayerController* PC = GetPlayerController();
+    if (!PC) return;
+    HerbCombineMenuWidget = CreateWidget<UHerbCombineMenu>(PC, HerbCombineMenuClass);
+    if (!HerbCombineMenuWidget) return;
+
+
+    if (!InventoryWidget || !InventoryWidget->CanvasPanel_Root) return;
+    UCanvasPanelSlot* Slot = InventoryWidget->CanvasPanel_Root->AddChildToCanvas(HerbCombineMenuWidget);
+
+    HerbCombineMenuWidget->RefreshCombineRecipeList(SelectItem->InventoryItemPayload.CombineTags);
+    UpdateHerbCounts();
+
+
+    Slot->SetAutoSize(true);
+    UItemWidget* ItemWidget = GetItemWidgetByIndex(SelectSlotIndex, SelectSlotType);
+    if (!ItemWidget) return;
+
+    FGeometry CachedGeometry = ItemWidget->GetCachedGeometry();
+    FVector2D PixelPosition;
+    FVector2D ViewportPosition;
+
+    USlateBlueprintLibrary::LocalToViewport(this, CachedGeometry, FVector2D(CachedGeometry.GetLocalSize().X, 0), PixelPosition, ViewportPosition);
+    Slot->SetPosition(ViewportPosition);
+  
+}
+
+void UInventoryHUDComponent::CloseHerbCombineMenuWidget(bool InPlaySound)
+{
+    if (HerbCombineMenuWidget) HerbCombineMenuWidget->RemoveFromParent();
+    HerbCombineMenuWidget = nullptr;
+    PlayInventorySound(InPlaySound ? E_InventorySoundType::CloseMenu : E_InventorySoundType::None);
+    SelectSlot(GetRealSelectedSlot().Index, GetRealSelectedSlot().Type, false);
+    UpdateControlHints(EInventoryStatus::Opened);
+}
+
+void UInventoryHUDComponent::UpdateHerbCounts()
+{
+    if (!HerbCombineMenuWidget) return;
+    const TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (Slot.IsEmpty || Slot.IsPartOfItem || !IsValid(Slot.ItemReference))
+            continue;
+
+        const FString& Name = Slot.ItemReference->InventoryItemPayload.ItemName;
+        int32 Amount = Slot.ItemReference->InventoryItemPayload.ItemAmount;
+
+        if (Name == TEXT("GreenHerb"))               HerbCombineMenuWidget->GreenHerbNum += Amount;
+        else if (Name == TEXT("RedHerb"))            HerbCombineMenuWidget->RedHerbNum += Amount;
+        else if (Name == TEXT("YellowHerb"))         HerbCombineMenuWidget->YellowHerbNum += Amount;
+        else if (Name == TEXT("MixedHerb_GG"))       HerbCombineMenuWidget->MixedHerb_GG_Num += Amount;
+        else if (Name == TEXT("MixedHerb_GR"))       HerbCombineMenuWidget->MixedHerb_GR_Num += Amount;
+        else if (Name == TEXT("MixedHerb_GY"))       HerbCombineMenuWidget->MixedHerb_GY_Num += Amount;
+        else if (Name == TEXT("MixedHerb_RY"))       HerbCombineMenuWidget->MixedHerb_RY_Num += Amount;
+        else if (Name == TEXT("MixedHerb_GGG"))      HerbCombineMenuWidget->MixedHerb_GGG_Num += Amount;
+        else if (Name == TEXT("MixedHerb_GGY"))      HerbCombineMenuWidget->MixedHerb_GGY_Num += Amount;
+        else if (Name == TEXT("MixedHerb_GRY"))      HerbCombineMenuWidget->MixedHerb_GRY_Num += Amount;
+    }
+
+    HerbCombineMenuWidget->UpdateHerbCounts();
+}
+
+void UInventoryHUDComponent::ExecuteCombine(const FString& InItemA, const FString& InItemB, const FString& OutResultItem)
+{
+    /*
+    AInspectableItem* SelectItem = nullptr;
+    if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
+    {
+        SelectItem = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+    }
+    if (!SelectItem) return;
+
+    const FString SelectItemName = SelectItem->InventoryItemPayload.ItemName;
+    FString UnderHerbMenuItemName;
+    FString SearchHerbMenuItemName;
+
+
+    if (SelectItemName == InItemA)
+    {
+        UnderHerbMenuItemName = InItemA;
+        SearchHerbMenuItemName = InItemB;
+    }
+    else if(SelectItemName == InItemB)
+    {
+        UnderHerbMenuItemName = InItemB;
+        SearchHerbMenuItemName = InItemA;
+    }
+    else
+    {
+        return;
+    }
+
+    //移除Herb配料
+    TArray<FSlotStruct>&Slots = GetSlots();
+    int32 SelectSlotFirstIndex = SelectItem->InventoryItemPayload.OccupiedSlots[0];
+    bool RemoveSerchFinish = false;
+    bool RemoveUnderFinish = false;
+
+
+
+    for (FSlotStruct Slot : Slots)
+    {
+        if (Slot.ItemReference && Slot.ItemReference->InventoryItemPayload.ItemName == SearchHerbMenuItemName && !Slot.IsPartOfItem && !Slot.IsEmpty && SelectSlotFirstIndex != Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0] && !RemoveSerchFinish)
+        {
+            RemoveItemsInSlot(Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary ,1, true);
+            RemoveSerchFinish = true;
+        }
+
+        if (Slot.ItemReference && SelectSlotFirstIndex == Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0] && !RemoveUnderFinish)
+        {
+            RemoveItemsInSlot(Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary, 1, true);
+            RemoveUnderFinish = true;
+        }
+
+        if (RemoveSerchFinish && RemoveUnderFinish) break;
+    }
+    
+
+    AInspectableItem* CombineItem = nullptr;
+
+    UInventoryData* InvData =  UInventoryStaticFunctions::GetInventoryOptions(this);
+    if (!InvData) return;
+    TSubclassOf<AInspectableItem>* FoundClass = InvData->InspectItemMap.Find(OutResultItem);
+    if (FoundClass && *FoundClass != nullptr)  CombineItem = Cast<AInspectableItem>((*FoundClass)->GetDefaultObject());
+    if (!CombineItem && CombineItem->InventoryItemPayload.ItemAmount <= 0) return;
+
+
+    const int32 Width = CombineItem->InventoryItemPayload.ItemIconSize.X;
+    const int32 Height = CombineItem->InventoryItemPayload.ItemIconSize.Y;
+    const int32 MaxStack = CombineItem->InventoryItemPayload.MaxStack;
+
+
+    TArray<int32> EmptySlots;
+    EItemRotation Rotation = EItemRotation::Horizontal;
+    const int32 SlotCount = Slots.Num();
+    bool FromSelectedSlotIndexBegin = false;
+
+    // 第一段：从 SelectedSlotIndex 到末尾
+    for (int32 i = SelectSlotFirstIndex; i < SlotCount; ++i)
+    {
+        const FSlotStruct& InventorySlot = Slots[i];
+        if (InventorySlot.IsEmpty)
+        {
+            // Horizontal
+            if (CheckSize(InventorySlot.Index, Width, Height, E_SlotsType::Primary) &&
+                CheckSlots(InventorySlot.Index, Width, Height, EmptySlots, E_SlotsType::Primary, TArray<int32>()))
+            {
+                Rotation = EItemRotation::Horizontal;
+                FromSelectedSlotIndexBegin = true;
+                break;
+            }
+            // Vertical
+            if (CheckSize(InventorySlot.Index, Height, Width, E_SlotsType::Primary) &&
+                CheckSlots(InventorySlot.Index, Height, Width, EmptySlots, E_SlotsType::Primary, TArray<int32>()))
+            {
+                Rotation = EItemRotation::Vertical;
+                FromSelectedSlotIndexBegin = true;
+                break;
+            }
+        }
+    }
+    
+    //如果从SelectSlotIndex开始就是选中的药草占据的格子开始
+    if (FromSelectedSlotIndexBegin)
+    {
+        AInspectableItem* AddCombineItem = AddItem_HelperFunction(CombineItem, Rotation, EmptySlots, E_SlotsType::Primary, 1);
+        AddItemWidgetToGrib(AddCombineItem, E_SlotsType::Primary);
+        bIgnoreMouseUp = true;
+        CloseHerbCombineMenuWidget(true);
+        return;
+    }
+    else
+    {
+        //正常添加拾取
+        if (FindEmptySlots(E_SlotsType::Primary, Width, Height, Rotation, EmptySlots, TArray<int32>()))
+        {
+            AInspectableItem* AddCombineItem = AddItem_HelperFunction(CombineItem, Rotation, EmptySlots, E_SlotsType::Primary, 1);
+            AddItemWidgetToGrib(AddCombineItem, E_SlotsType::Primary);
+            bIgnoreMouseUp = true;
+            CloseHerbCombineMenuWidget(true);
+            return;
+        }
+        else
+        {
+            //如果正常添加也满了，看看情况
+        }
+    }
+    */
+
+     // 1. 获取当前选中的物品
+    AInspectableItem* SelectItem = nullptr;
+    if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
+    {
+        SelectItem = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
+    }
+    if (!SelectItem) return;
+
+    const FString SelectName = SelectItem->InventoryItemPayload.ItemName;
+
+    // 2. 确定两种材料的名称
+    FString UnderName, SearchName;
+    if (SelectName == InItemA)
+    {
+        UnderName = InItemA;
+        SearchName = InItemB;
+    }
+    else if (SelectName == InItemB)
+    {
+        UnderName = InItemB;
+        SearchName = InItemA;
+    }
+    else
+    {
+        return;
+    }
+
+    // 3. 获取结果物品的数据
+    UInventoryData* InvData = UInventoryStaticFunctions::GetInventoryOptions(this);
+    if (!InvData) return;
+
+    TSubclassOf<AInspectableItem>* FoundClass = InvData->InspectItemMap.Find(OutResultItem);
+    if (!FoundClass || !*FoundClass) return;
+
+    AInspectableItem* ResultCDO = Cast<AInspectableItem>((*FoundClass)->GetDefaultObject());
+    if (!ResultCDO) return;
+
+    const int32 ResultWidth = ResultCDO->InventoryItemPayload.ItemIconSize.X;
+    const int32 ResultHeight = ResultCDO->InventoryItemPayload.ItemIconSize.Y;
+    if (ResultWidth <= 0 || ResultHeight <= 0) return;
+
+    // 4. 查找两种材料（确保 SearchItem 不是选中的那个）
+    TArray<FSlotStruct>& Slots = GetSlots(E_SlotsType::Primary);
+    AInspectableItem* UnderItem = nullptr;
+    AInspectableItem* SearchItem = nullptr;
+    int32 UnderCount = 0, SearchCount = 0;
+    int32 SelectSlotFirstIndex = SelectItem->InventoryItemPayload.OccupiedSlots[0];
+
+    for (const FSlotStruct& Slot : Slots)
+    {
+        if (Slot.IsEmpty || Slot.IsPartOfItem || !IsValid(Slot.ItemReference)) continue;
+
+        const FString& SlotName = Slot.ItemReference->InventoryItemPayload.ItemName;
+        int32 SlotFirstIndex = Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0];
+
+        // 选中的材料（UnderItem）
+        if (SlotName == UnderName && UnderCount == 0 && SlotFirstIndex == SelectSlotFirstIndex)
+        {
+            UnderItem = Slot.ItemReference;
+            UnderCount = UnderItem->InventoryItemPayload.ItemAmount;
+        }
+        // 另一种材料（SearchItem），必须不是选中的那个
+        if (SlotName == SearchName && SearchCount == 0 && SlotFirstIndex != SelectSlotFirstIndex)
+        {
+            SearchItem = Slot.ItemReference;
+            SearchCount = SearchItem->InventoryItemPayload.ItemAmount;
+        }
+        if (UnderItem && SearchItem) break;
+    }
+
+    if (!UnderItem || !SearchItem || UnderCount <= 0 || SearchCount <= 0) return;
+
+    // 5. 构建排除列表（两个材料占用的所有格子）
+    TArray<int32> ExcludeSlots;
+    ExcludeSlots.Append(UnderItem->InventoryItemPayload.OccupiedSlots);
+    ExcludeSlots.Append(SearchItem->InventoryItemPayload.OccupiedSlots);
+
+    // 6. 预检查空间（优先从选中材料的起始位置开始）
+    TArray<int32> EmptySlots;
+    EItemRotation Rotation = EItemRotation::Horizontal;
+    bool bFound = false;
+
+    for (int32 i = SelectSlotFirstIndex; i < Slots.Num(); ++i)
+    {
+        if (Slots[i].IsEmpty || ExcludeSlots.Contains(i))
+        {
+            if (CheckSize(i, ResultWidth, ResultHeight, E_SlotsType::Primary) &&
+                CheckSlots(i, ResultWidth, ResultHeight, EmptySlots, E_SlotsType::Primary, ExcludeSlots))
+            {
+                Rotation = EItemRotation::Horizontal;
+                bFound = true;
+                break;
+            }
+            if (CheckSize(i, ResultHeight, ResultWidth, E_SlotsType::Primary) &&
+                CheckSlots(i, ResultHeight, ResultWidth, EmptySlots, E_SlotsType::Primary, ExcludeSlots))
+            {
+                Rotation = EItemRotation::Vertical;
+                bFound = true;
+                break;
+            }
+        }
+    }
+
+    if (!bFound)
+    {
+        EmptySlots.Empty();
+        bFound = FindEmptySlots(E_SlotsType::Primary, ResultWidth, ResultHeight, Rotation, EmptySlots, ExcludeSlots);
+    }
+
+    if (!bFound)
+    {
+        // 无空间，合成失败，不消耗材料
+        PlayInventorySound(E_InventorySoundType::CombineFailed);
+        return;
+    }
+
+    // 7. 执行移除材料（各消耗1个）
+    // 注意：RemoveAll=false 表示按数量减少，数量为0时自动清除
+    RemoveItemsInSlot(UnderItem->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary, 1, false);
+    RemoveItemsInSlot(SearchItem->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary, 1, false);
+
+    // 8. 添加合成结果
+    AInspectableItem* NewItem = AddItem_HelperFunction(ResultCDO, Rotation, EmptySlots, E_SlotsType::Primary, 1);
+    if (NewItem)
+    {
+        AddItemWidgetToGrib(NewItem, E_SlotsType::Primary);
+    }
+
+    // 9. 清理UI
+    bIgnoreMouseUp = true;
+    CloseHerbCombineMenuWidget(true);
+}
+
 
 
 

@@ -112,7 +112,7 @@ class UItemActionConfirmWidget;
 class UShortcutWidget;
 class UInspectItemWidget;
 class AInspectItem;
-
+class UHerbCombineMenu;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZOMBIETEMPLATE_API UInventoryHUDComponent : public UActorComponent
@@ -554,5 +554,30 @@ public:
 
 #pragma endregion
 
+
+#pragma region HerbCombineMenu
+
+public:
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<UHerbCombineMenu> HerbCombineMenuClass;
+
+	UPROPERTY()
+	UHerbCombineMenu* HerbCombineMenuWidget = nullptr;
+
+	UFUNCTION()
+	void CreateHerbCombineMenuWidget();
+
+	UFUNCTION()
+	void CloseHerbCombineMenuWidget(bool InPlaySound = true);
+
+	UFUNCTION()
+	void UpdateHerbCounts();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|HerbCombineMenu")
+	void ExecuteCombine(const FString& InItemA, const FString& InItemB, const FString& OutResultItem);
+
+
+#pragma endregion
 
 };

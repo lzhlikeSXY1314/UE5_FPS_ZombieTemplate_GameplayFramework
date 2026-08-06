@@ -11,7 +11,7 @@
 
 class UInventorySlotWidget;
 class UMaterialInstance;
-
+class AInspectableItem;
 
 UENUM(BlueprintType)
 enum class EItemBackgroundState : uint8
@@ -104,6 +104,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|ShortcutSlot Materials")
 	FShortcutSlotMaterials ShortcutSlotsMaterials;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Combine")
+	TMap<FString, TSubclassOf<AInspectableItem>> InspectItemMap;
 };
 
 
