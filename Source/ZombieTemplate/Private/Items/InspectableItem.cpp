@@ -101,6 +101,10 @@ void AInspectableItem::DiscardItemInInventory_Implementation(int32 Quantity)
 }
 
 
+void AInspectableItem::UseItemInInventory_Implementation()
+{
+}
+
 // Called when the game starts or when spawned
 void AInspectableItem::BeginPlay()
 {

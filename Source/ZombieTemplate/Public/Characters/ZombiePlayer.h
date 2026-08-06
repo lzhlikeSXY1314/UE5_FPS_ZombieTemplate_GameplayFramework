@@ -280,7 +280,7 @@ public:
         float MaxHealth = 100.0f;
 
         /** 当前生命值 */
-        UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Health")
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player|Health")
         float CurrentHealth = 100.0f;
 
         /** 是否显示调试血量 */

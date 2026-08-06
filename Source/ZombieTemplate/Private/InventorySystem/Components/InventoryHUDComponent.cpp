@@ -2304,6 +2304,22 @@ void UInventoryHUDComponent::MenuButtonResponseFunction(E_ItemActionType ActionT
         return;
     }
 
+    if (ActionType == E_ItemActionType::Use)
+    {
+        bIgnoreMouseUp = true;
+        if (ItemMenuWidget)
+        {
+            ItemMenuWidget->RemoveFromParent();
+            ItemMenuWidget = nullptr;
+        }
+
+        AZombiePlayer* Player = UInventoryStaticFunctions::GetPlayerRef(this);
+        if (!Player) return;
+        AInspectableItem* Item = GetSlots(CreateMenuInfo.Type)[CreateMenuInfo.Index].ItemReference;
+        Item->UseItemInInventory();
+        RemoveItemByRef(Item, 1, false);
+        return;
+    }
 }
 
 void UInventoryHUDComponent::CreateItemActionConfirmWidget(AInspectableItem* Item, bool ShowNumBlock, int32 InMaxValue, E_ItemActionType ActionType, bool ShowMsg)
@@ -2745,131 +2761,6 @@ void UInventoryHUDComponent::UpdateHerbCounts()
 
 void UInventoryHUDComponent::ExecuteCombine(const FString& InItemA, const FString& InItemB, const FString& OutResultItem)
 {
-    /*
-    AInspectableItem* SelectItem = nullptr;
-    if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))
-    {
-        SelectItem = GetSlots(SelectSlotType)[SelectSlotIndex].ItemReference;
-    }
-    if (!SelectItem) return;
-
-    const FString SelectItemName = SelectItem->InventoryItemPayload.ItemName;
-    FString UnderHerbMenuItemName;
-    FString SearchHerbMenuItemName;
-
-
-    if (SelectItemName == InItemA)
-    {
-        UnderHerbMenuItemName = InItemA;
-        SearchHerbMenuItemName = InItemB;
-    }
-    else if(SelectItemName == InItemB)
-    {
-        UnderHerbMenuItemName = InItemB;
-        SearchHerbMenuItemName = InItemA;
-    }
-    else
-    {
-        return;
-    }
-
-    //移除Herb配料
-    TArray<FSlotStruct>&Slots = GetSlots();
-    int32 SelectSlotFirstIndex = SelectItem->InventoryItemPayload.OccupiedSlots[0];
-    bool RemoveSerchFinish = false;
-    bool RemoveUnderFinish = false;
-
-
-
-    for (FSlotStruct Slot : Slots)
-    {
-        if (Slot.ItemReference && Slot.ItemReference->InventoryItemPayload.ItemName == SearchHerbMenuItemName && !Slot.IsPartOfItem && !Slot.IsEmpty && SelectSlotFirstIndex != Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0] && !RemoveSerchFinish)
-        {
-            RemoveItemsInSlot(Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary ,1, true);
-            RemoveSerchFinish = true;
-        }
-
-        if (Slot.ItemReference && SelectSlotFirstIndex == Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0] && !RemoveUnderFinish)
-        {
-            RemoveItemsInSlot(Slot.ItemReference->InventoryItemPayload.OccupiedSlots[0], E_SlotsType::Primary, 1, true);
-            RemoveUnderFinish = true;
-        }
-
-        if (RemoveSerchFinish && RemoveUnderFinish) break;
-    }
-    
-
-    AInspectableItem* CombineItem = nullptr;
-
-    UInventoryData* InvData =  UInventoryStaticFunctions::GetInventoryOptions(this);
-    if (!InvData) return;
-    TSubclassOf<AInspectableItem>* FoundClass = InvData->InspectItemMap.Find(OutResultItem);
-    if (FoundClass && *FoundClass != nullptr)  CombineItem = Cast<AInspectableItem>((*FoundClass)->GetDefaultObject());
-    if (!CombineItem && CombineItem->InventoryItemPayload.ItemAmount <= 0) return;
-
-
-    const int32 Width = CombineItem->InventoryItemPayload.ItemIconSize.X;
-    const int32 Height = CombineItem->InventoryItemPayload.ItemIconSize.Y;
-    const int32 MaxStack = CombineItem->InventoryItemPayload.MaxStack;
-
-
-    TArray<int32> EmptySlots;
-    EItemRotation Rotation = EItemRotation::Horizontal;
-    const int32 SlotCount = Slots.Num();
-    bool FromSelectedSlotIndexBegin = false;
-
-    // 第一段：从 SelectedSlotIndex 到末尾
-    for (int32 i = SelectSlotFirstIndex; i < SlotCount; ++i)
-    {
-        const FSlotStruct& InventorySlot = Slots[i];
-        if (InventorySlot.IsEmpty)
-        {
-            // Horizontal
-            if (CheckSize(InventorySlot.Index, Width, Height, E_SlotsType::Primary) &&
-                CheckSlots(InventorySlot.Index, Width, Height, EmptySlots, E_SlotsType::Primary, TArray<int32>()))
-            {
-                Rotation = EItemRotation::Horizontal;
-                FromSelectedSlotIndexBegin = true;
-                break;
-            }
-            // Vertical
-            if (CheckSize(InventorySlot.Index, Height, Width, E_SlotsType::Primary) &&
-                CheckSlots(InventorySlot.Index, Height, Width, EmptySlots, E_SlotsType::Primary, TArray<int32>()))
-            {
-                Rotation = EItemRotation::Vertical;
-                FromSelectedSlotIndexBegin = true;
-                break;
-            }
-        }
-    }
-    
-    //如果从SelectSlotIndex开始就是选中的药草占据的格子开始
-    if (FromSelectedSlotIndexBegin)
-    {
-        AInspectableItem* AddCombineItem = AddItem_HelperFunction(CombineItem, Rotation, EmptySlots, E_SlotsType::Primary, 1);
-        AddItemWidgetToGrib(AddCombineItem, E_SlotsType::Primary);
-        bIgnoreMouseUp = true;
-        CloseHerbCombineMenuWidget(true);
-        return;
-    }
-    else
-    {
-        //正常添加拾取
-        if (FindEmptySlots(E_SlotsType::Primary, Width, Height, Rotation, EmptySlots, TArray<int32>()))
-        {
-            AInspectableItem* AddCombineItem = AddItem_HelperFunction(CombineItem, Rotation, EmptySlots, E_SlotsType::Primary, 1);
-            AddItemWidgetToGrib(AddCombineItem, E_SlotsType::Primary);
-            bIgnoreMouseUp = true;
-            CloseHerbCombineMenuWidget(true);
-            return;
-        }
-        else
-        {
-            //如果正常添加也满了，看看情况
-        }
-    }
-    */
-
      // 1. 获取当前选中的物品
     AInspectableItem* SelectItem = nullptr;
     if (GetSlots(SelectSlotType).IsValidIndex(SelectSlotIndex))

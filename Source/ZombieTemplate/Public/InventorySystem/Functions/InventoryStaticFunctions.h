@@ -36,4 +36,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory", meta = (WorldContext = "WorldContextObject"))
 	static AZombiePlayer* GetPlayerRef(UObject* WorldContextObject);
+
+
+
 };

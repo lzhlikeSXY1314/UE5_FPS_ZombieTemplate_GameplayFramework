@@ -10,6 +10,21 @@
 #include "InventorySystem/Widgets/ItemWidget.h"
 #include "InspectableItem.generated.h"
 
+USTRUCT(BlueprintType)
+struct FHerbEffect
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Herb")
+	int32 HealValue = 0;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Herb")
+	bool bFullHeal = false;  
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Herb")
+	int32 AddMaxHP = 0;    
+};
+
 
 
 UCLASS()
@@ -53,6 +68,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget Data")
 	FInventoryItemPayload InventoryItemPayload;
 
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Herb")
+	FHerbEffect HerbEffect;
+
 	UFUNCTION(BlueprintCallable, Category = "Item Widget Data")
 	FText GetItemInteractMes(bool bShowAmount = true) const
 	{
@@ -79,6 +97,9 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
     void DiscardItemInInventory(int32 Quantity);
+
+	UFUNCTION(BlueprintNativeEvent, Category = "Inventory")
+	void UseItemInInventory();
 
 protected:
 	// Called when the game starts or when spawned
